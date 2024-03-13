@@ -22,8 +22,8 @@ import (
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/upbound/uptest/internal"
-	"github.com/upbound/uptest/internal/config"
+	"github.com/crossplane/uptest/internal"
+	"github.com/crossplane/uptest/internal/config"
 )
 
 var (

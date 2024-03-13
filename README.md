@@ -133,7 +133,7 @@ Running kuttl tests at /var/folders/_5/jc7399qx6cn6t5535npv9z4c0000gn/T/uptest-e
 ## Report a Bug
 
 For filing bugs, suggesting improvements, or requesting new features, please
-open an [issue](https://github.com/upbound/uptest/issues).
+open an [issue](https://github.com/crossplane/uptest/issues).
 
 ## Licensing
 

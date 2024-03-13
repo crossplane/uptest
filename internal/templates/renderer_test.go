@@ -20,7 +20,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/upbound/uptest/internal/config"
+	"github.com/crossplane/uptest/internal/config"
 )
 
 const (

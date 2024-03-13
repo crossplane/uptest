@@ -1,6 +1,6 @@
 # Project Setup
 PROJECT_NAME := uptest
-PROJECT_REPO := github.com/upbound/$(PROJECT_NAME)
+PROJECT_REPO := github.com/crossplane/$(PROJECT_NAME)
 
 PLATFORMS ?= linux_amd64 linux_arm64 darwin_amd64 darwin_arm64
 

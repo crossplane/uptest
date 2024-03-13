@@ -27,8 +27,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
-	"github.com/upbound/uptest/internal/config"
-	"github.com/upbound/uptest/internal/templates"
+	"github.com/crossplane/uptest/internal/config"
+	"github.com/crossplane/uptest/internal/templates"
 )
 
 func newTester(ms []config.Manifest, opts *config.AutomatedTest) *tester {

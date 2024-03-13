@@ -20,7 +20,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
-	"github.com/upbound/uptest/internal/config"
+	"github.com/crossplane/uptest/internal/config"
 )
 
 // RunTest runs the specified automated test
