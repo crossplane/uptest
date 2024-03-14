@@ -32,7 +32,7 @@ import (
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/uptest/internal/config"
+	"github.com/crossplane/uptest/internal/config"
 )
 
 var (

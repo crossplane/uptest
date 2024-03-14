@@ -1,6 +1,6 @@
 # Project Setup
 PROJECT_NAME := uptest
-PROJECT_REPO := github.com/upbound/$(PROJECT_NAME)
+PROJECT_REPO := github.com/crossplane/$(PROJECT_NAME)
 
 PLATFORMS ?= linux_amd64 linux_arm64 darwin_amd64 darwin_arm64
 
@@ -12,7 +12,7 @@ PLATFORMS ?= linux_amd64 linux_arm64 darwin_amd64 darwin_arm64
 
 # ====================================================================================
 # Setup Output
-S3_BUCKET ?= upbound.official-providers-ci.releases
+S3_BUCKET ?= crossplane.uptest.releases
 -include build/makelib/output.mk
 
 # ====================================================================================
@@ -22,7 +22,7 @@ GO_REQUIRED_VERSION = 1.21
 # Uncomment below if you need to override the version.
 # GOLANGCILINT_VERSION ?= 1.54.0
 
-GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/uptest $(GO_PROJECT)/cmd/crddiff $(GO_PROJECT)/cmd/buildtagger $(GO_PROJECT)/cmd/updoc $(GO_PROJECT)/cmd/ttr $(GO_PROJECT)/cmd/perf $(GO_PROJECT)/cmd/linter/lint-provider-family
+GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/uptest
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 GO_SUBDIRS += cmd internal
 GO111MODULE = on

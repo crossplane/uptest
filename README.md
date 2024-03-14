@@ -1,5 +1,11 @@
 # UPTEST
 
+_Note:_ The `uptest` tool used to live in the https://github.com/upbound/uptest
+repository. We have moved it to this repository
+(https://github.com/crossplane/uptest) and kept the old repository instead of
+renaming it because the provider reusable CI workflows and the other CI tooling
+such as `crddiff` or `updoc` still reside in there.
+
 The end to end integration testing tool for Crossplane providers and configurations.
 
 Uptest comes as a binary which can be installed from the releases section. It runs end-to-end tests
@@ -133,7 +139,7 @@ Running kuttl tests at /var/folders/_5/jc7399qx6cn6t5535npv9z4c0000gn/T/uptest-e
 ## Report a Bug
 
 For filing bugs, suggesting improvements, or requesting new features, please
-open an [issue](https://github.com/upbound/uptest/issues).
+open an [issue](https://github.com/crossplane/uptest/issues).
 
 ## Licensing
 

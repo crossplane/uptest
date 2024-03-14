@@ -1,6 +1,6 @@
 # Integrating Uptest for End to End Testing
 
-In this tutorial, we will integrate [uptest](https://github.com/upbound/uptest) to a Github repository to automate end to end
+In this tutorial, we will integrate [uptest](https://github.com/crossplane/uptest) to a Github repository to automate end to end
 testing managed resources. While we will use a `Provider` repository as an example, the process will be almost identical
 for a `Configuration` repository.
 

@@ -34,7 +34,7 @@ linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
-    local-prefixes: github.com/upbound/uptest
+    local-prefixes: github.com/crossplane/uptest
 
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)

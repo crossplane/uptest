@@ -4,10 +4,10 @@ metadata:
   name: uptest
   description: "End to end integration testing for Crossplane Providers and Configurations"
   links:
-    - url: https://github.com/upbound/uptest/blob/main/README.md
+    - url: https://github.com/crossplane/uptest/blob/main/README.md
       title: Uptest readme
   annotations:
-    github.com/project-slug: upbound/uptest
+    github.com/project-slug: crossplane/uptest
 spec:
   type: service
   lifecycle: production
