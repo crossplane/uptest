@@ -4,7 +4,7 @@
 
 // Package internal implements the uptest runtime for running
 // automated tests using resource example manifests
-// using kuttl.
+// using chainsaw.
 package internal
 
 import (
