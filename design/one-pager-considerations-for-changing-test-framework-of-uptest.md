@@ -14,25 +14,26 @@ update, import, deletion, and other operations of Crossplane resources.
 When `Uptest` was first written, it used [kuttl](https://github.com/kudobuilder/kuttl)
 as the underlying test framework in order to have good declarative testing
 capabilities. Over time, it was realized that there are better and more
-compatible alternatives and `kuttl` is a tool that is not currently maintained,
-so it was decided to change the underlying framework.
+compatible alternatives and a perception that `kuttl` isn't being actively
+maintained, so it was decided to evaluate an alternative underlying framework.
 
 [kuttl](https://github.com/kudobuilder/kuttl) provides a declarative approach to
 test Kubernetes Operators. `kuttl` is designed for testing operators, however it
 can declaratively test any kubernetes objects.
 
-While starting to the `Uptest` effort, we considered a few different
-alternatives and `kuttl`'s capabilities were appropriate for our assertion
-aims although its missing points. Today, we consider changing the underlying
-test framework tool because of the `kuttl` stopped to be actively maintained.
+When starting the `Uptest` effort, we considered a few different alternatives
+and `kuttl`'s capabilities were appropriate for our assertion aims even though
+it missed some points. Today, we consider changing the underlying test framework
+tool because of the perception of `kuttl` not being actively maintained and
+other frameworks offering superior capabilities.
 
 ## Goals
 
-- Determining the requirements of Uptest well and revealing its needs.
-- Having a more inclusive and capable underlying test framework.
-- Use of a more up-to-date and maintained tool in the background.
+Decide on a more comprehensive underlying test framework to meet the current
+and [future requirements](https://github.com/crossplane/uptest/pull/10/files) of
+Uptest.
 
-## Proposal - Switching to `chainsaw` tool
+## Proposal - Switching to `chainsaw`
 
 [chainsaw](https://github.com/kyverno/chainsaw) provides a declarative approach
 to test Kubernetes operators and controllers. While Chainsaw is designed for
@@ -40,12 +41,14 @@ testing operators and controllers, it can declaratively test any Kubernetes
 objects. Chainsaw is an open-source tool that was initially developed for
 defining and running Kyverno end-to-end tests. The tool has Apache-2.0 license.
 
-In addition to the functionality provided by `kuttl`, the prominent features of
-the `chainsaw` tool are that it is maintained up to date and has an
-infrastructure for migration from `kuttl`.
+In addition to providing similar functionality provided by `kuttl`,  it also
+offers better logs, config maps assertions,
+[assertions trees](https://kyverno.io/blog/2023/12/13/kyverno-chainsaw-exploring-the-power-of-assertion-trees/)
+and many more things. The fact that it is well-maintained, and has the
+capability for migration from `kuttl` makes it an attractive option.
 
-There are very similar concepts in `chainsaw` with `kuttl`. By this way, we do
-not have to make important changes in the templates.
+`chainsaw` shares similar concepts with `kuttl`. In this way, we do not have to
+make major changes to the templates.
 
 ```yaml
 apiVersion: chainsaw.kyverno.io/v1alpha1
@@ -123,8 +126,8 @@ spec:
 
 Related Issue: https://github.com/upbound/official-providers-ci/issues/179
 
-In short, the `chainsaw` is more capable and maintained tool than `kuttl`. So,
-switching to this new tool may better for handling the Uptest requirements.
+In short, `chainsaw` is a more capable and well-maintained framework than
+`kuttl` and switching to it will better suit Uptest's future requirements.
 
 ## Alternative Considered
 
@@ -143,9 +146,12 @@ However, this will mean changing the entire `Uptest` code-base currently used.
 In this context, it should be taken into consideration that such a change would
 be quite large.
 
-Based on the discussion here, an analysis can be made to clarify the use cases
-of `Uptest` and the `e2e-framework` and which one the user would prefer
-according to their needs through documentation.
+As mentioned in the [discussion](https://github.com/crossplane-contrib/provider-argocd/pull/89#issuecomment-2016655783),
+to clarify the use cases of `Uptest` and `e2e-framework`, it might be good to
+strengthen the documentation of the tools. One could also write a guideline that
+directly compares the two tools and discusses their capabilities and use cases.
+This way, the end user can more easily decide when to use `Uptest` and when to
+use `e2e-framework`.
 
 ### Writing a Underlying Test Framework From Scratch
 
