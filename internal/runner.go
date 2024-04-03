@@ -15,11 +15,13 @@ import (
 
 // RunTest runs the specified automated test
 func RunTest(o *config.AutomatedTest) error {
-	defer func() {
-		if err := os.RemoveAll(o.Directory); err != nil {
-			fmt.Println(fmt.Sprint(err, "cannot clean the test directory"))
-		}
-	}()
+	if !o.RenderOnly {
+		defer func() {
+			if err := os.RemoveAll(o.Directory); err != nil {
+				fmt.Println(fmt.Sprint(err, "cannot clean the test directory"))
+			}
+		}()
+	}
 
 	// Read examples and inject data source values to manifests
 	manifests, err := newPreparer(o.ManifestPaths, withDataSource(o.DataSourcePath), withTestDirectory(o.Directory)).prepareManifests()

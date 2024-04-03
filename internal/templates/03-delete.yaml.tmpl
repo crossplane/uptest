@@ -1,23 +1,51 @@
 # This file belongs to the resource delete step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-{{- range $resource := .Resources }}
-{{- if eq $resource.KindGroup "secret." -}}
-  {{continue}}
-{{- end -}}
-{{- if eq $resource.KindGroup "namespace." -}}
-  {{continue}}
-{{- end -}}
-{{- if $resource.PreDeleteScriptPath }}
-- command: {{ $resource.PreDeleteScriptPath }}
-{{- end }}
-{{- if $resource.Namespace }}
-- command: ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --namespace {{ $resource.Namespace }} --ignore-not-found
-{{- else }}
-- command: ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --ignore-not-found
-{{- end }}
-{{- if $resource.PostDeleteScriptPath }}
-- command: {{ $resource.PostDeleteScriptPath }}
-{{- end }}
-{{- end }}
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: delete
+spec:
+  timeouts:
+    exec: {{ .TestCase.Timeout }}
+  steps:
+  - name: Delete Resources
+    description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
+    try:
+    - script:
+        content: |
+        {{- range $resource := .Resources }}
+        {{- if eq $resource.KindGroup "secret." -}}
+          {{continue}}
+        {{- end -}}
+        {{- if $resource.PreDeleteScriptPath }}
+          {{ $resource.PreDeleteScriptPath }}
+        {{- end }}
+        {{- if $resource.Namespace }}
+          ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --namespace {{ $resource.Namespace }} --ignore-not-found
+        {{- else }}
+          ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --ignore-not-found
+        {{- end }}
+        {{- if $resource.PostDeleteScriptPath }}
+          {{ $resource.PostDeleteScriptPath }}
+        {{- end }}
+        {{- end }}
+  - name: Assert Deletion
+    description: Assert deletion of resources.
+    try:
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end }}
+    - wait:
+        apiVersion: {{ $resource.APIVersion }}
+        kind: {{ $resource.Kind }}
+        name: {{ $resource.Name }}
+        {{- if $resource.Namespace }}
+        namespace: {{ $resource.Namespace }}
+        {{- end }}
+        for:
+          deletion: {}
+    {{- end }}
+    {{- if .TestCase.TeardownScriptPath }}
+    - command:
+        entrypoint: {{ .TestCase.TeardownScriptPath }}
+    {{- end }}
