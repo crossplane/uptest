@@ -11,52 +11,53 @@ utilized to test the behavior of Crossplane controllers, resource management
 operations, and other Crossplane components. Uptest can simulate the creation,
 update, import, deletion, and other operations of Crossplane resources.
 
-The primary goal of Uptest is to facilitate the testing process of Crossplane.
-It integrates seamlessly with Crossplane and provides a testing infrastructure
-that enables users to create and run test scenarios for validating the
-reliability, functionality, and performance of Crossplane.
+The primary goal of Uptest is to facilitate the testing process of Crossplane
+resources. It integrates seamlessly with Crossplane and provides a testing
+infrastructure that enables users to create and run test scenarios for
+validating the reliability, functionality, and performance of Crossplane
+resources.
 
-Uptest first came to the forefront as a tool designed to run e2e tests on GitHub
-environment. Then, various improvements were made in order to run easily in
-local environments. However, the tool was not considered a standalone project
-in the first place. Uptest, which was designed to run tests in more controlled
-environments (for example, a Kind cluster that was created from scratch) rather
-than running tests on any arbitrary Kubernetes cluster, has progressed to become
-a standalone project day by day. The main reason for this is that Uptest is now
-also on the agenda in the context of user integrations.
+Uptest was developed as a tool designed to run e2e tests in the GitHub Actions
+environment. Then, various improvements were made to ensure it ran in local
+environments. However, the tool was not considered a standalone project in the
+first place. Uptest was designed to run tests in more controlled environments
+(for example, a Kind cluster created from scratch) rather than running tests on
+any arbitrary Kubernetes cluster, and has evolved to become a standalone project
+over time. Today Uptest is being evaluated as a tool for users to integrate into
+their Crossplane development pipelines.
 
 As a result, it is necessary to work on various enhancements for Uptest to
 continue its development as a more powerful and independent tool. In this
 document, evaluations will be made on the present and future of Uptest and the
 aspects to be developed.
 
-In its current form, Uptest offers its users a very large test framework.
-Thanks to this framework, we have the ability to test and validate many
-different MRs simultaneously and seamlessly.
+In its current form, Uptest offers its users an extensive test framework. This
+framework allows us to test and validate many different MRs simultaneously and
+seamlessly.
 
-For Crossplane providers, it is not enough for us to see `Ready: True` in the
-status of an MR. `Late-initialization` that occurs after the resource is `Ready`
-or the resource is not stable and is subjected to a continuous update loop are
-actually situations that do not affect the Ready state of the resource but
+For Crossplane providers, it is not enough to see `Ready: True` in the status of
+an MR. `Late-initialization` that occurs after the resource is `Ready` or the
+resource is not stable and is subjected to a continuous update loop, are
+actually situations that do not affect the `Ready` state of the resource but
 affect its lifecycle.
 
-Therefore, to overcome some of the problems hidden behind this `Ready`
-condition, we use the `UpToDate` condition, which is only used in tests and
-activated by a specific annotation. This condition makes sure that after the
-resource is `Ready`, the `Late-Initialization` step is done and the resource is
-not stuck in any update loop.
+To overcome some of the problems hidden behind this `Ready` condition, we use
+the `UpToDate` condition, which is only used in tests and activated by a
+specific annotation. This condition makes sure that after the resource is
+`Ready`, the `Late-Initialization` step is done, and the resource is not stuck
+in any update loop.
 
 For some MRs, it is vital that their names (or some identifier field values) are
-randomized. If the name of a resource is not unique, this will cause a conflict
-and the resource cannot be created or an existing resource can be updated. There
-are two main issues for this conflict to occur. One is that some resources
-expect a universally unique name to be identified. In other words, we are
-talking about a name that will be unique on all cloud providers regardless of
-account or organization. The other issue is the need for uniqueness on a smaller
-scale, that is, within the account or organization used. At the end of the day,
-there is a need to generate random strings for some fields of some resources.
-Currently, there is only support for this in one format and only for some
-fields.
+randomized. If the name of a resource is not unique, this will cause a conflict,
+and the resource cannot be created, or an existing resource could be updated.
+Two main issues need to be addressed to avoid this conflict. One is that some
+resources expect a universally unique name to be identified. In other words, we
+are talking about a name that will be unique on all cloud providers regardless
+of account or organization. The other issue is the need for uniqueness on a
+smaller scale, that is, within the account or organization used. At the end of
+the day, there is a need to generate random strings for some fields of some
+resources. Currently, there is only support for this in one format and only for
+some fields.
 
 Test cases that initially included only the `Apply` and `Delete` steps now also
 include the `Update` and `Import` steps. These new steps are very important in
@@ -64,52 +65,41 @@ terms of increasing the test coverage of the lifecycle of resources. The
 `Import` step is also an important coverage point in terms of testing whether
 the external name configuration of the resources is done correctly. The
 validations performed during the transition to the new provider architecture,
-especially the new `Import` step played a critical role in the early detection
-of many bugs and problems.
+especially the new `Import` step, played a critical role in detecting many bugs
+and problems early.
 
 ## Goals
 
-- Increasing Uptest's test coverage by adding different test scenarios.
-- Making Uptest capable of running tests on arbitrary clusters.
-- Improvement of Uptest Documents: User Guide, Technical Docs, etc.
-- In cases where Uptest fails, debugging/logging should be improved to
-understand what the problem is.
-- Increasing the client's configuration ability by making some features of
-Uptest parametric at the CLI level.
+- Increase Uptest's test capabilities by accommodating different test scenarios.
+- Make Uptest capable of running tests on arbitrary clusters.
+- Improve uptest documentation, such as user guides, technical documents, etc.
+- In cases where Uptest tests fail, debugging/logging should be improved to
+allow the user to understand the problem easily.
+- Increasing the configurability of Uptest by introducing parametric options to
+the CLI.
 
 ## Proposal
 
-In this document, it is suggested to achieve the above goals by making various
-improvements on the existing Uptest tool. These improvements will be analyzed
-item by item starting from the next section. The main goal is to make Uptest a
+The proposals below are suggested to achieve the above goals by making various
+improvements to the existing Uptest tool.  The main goal is to make Uptest a
 more stable and inclusive standalone tool at the end of the day.
 
-### Increasing Coverage
+## Increased test capabilities
 
-Increasing the capacities of the tool prepared so far will help us in the
-process of evolving the tool into a standalone tool both in test coverage and
-in the long run.
+Increasing the capabilities of Uptest will help us in the process of evolving it
+into a standalone tool both for test coverage and future use cases.
 
-#### Release Tests for Providers
-
-It is important to use various automation in the tests performed before
-releases. Today there are no customized tests for this. Usually, the usual tests
-from Uptest are used for a few random resources. In this context, various
-end-to-end tests prepared to work before the releases will increase the level of
-confidence in the releases.
-
-#### Upgrade Tests
+### Provider upgrade testing
 
 When Uptest first appeared, it was mainly concerned with testing whether a
-resource was working properly. Today, it has become a more end-to-end testing
-infrastructure. Especially in periods when many validations are needed, such as
-the transition to a new architecture, before the release, everyone knows how
-urgent such a need is. In this context, it is valuable that Uptest also handles
-some end-to-end cases.
+resource worked properly. Today, it has become an end-to-end testing solution.
+Especially when many validations are needed, such as the transition to a new
+architecture or before a release. In this context, it is valuable that Uptest
+also handles some end-to-end cases.
 
-In fact, Uptest tests some basic general steps in each case, such as setting up
+Uptest tests some basic general steps in each case, such as setting up
 Crossplane and provider and testing ProviderConfig (Secret source). However, the
-`Upgrade` test, which is one of the main paths, can also be considered as an
+`Upgrade` test, which is one of the main paths, can also be considered an
 end-to-end test in this context. Running an automated test along with the
 manual tests will increase the confidence level of developers. Roughly, the
 `Upgrade` test can look like this:
@@ -131,7 +121,7 @@ uptest upgrade --source v1.0.0 --target v1.1.0 --data-source="${UPTEST_DATASOURC
 Testing a scenario like this would be especially valuable in terms of increasing
 coverage and improving confidence levels ahead of the provider releases.
 
-#### Diff Tests
+### Diff tests - Release testing for providers
 Before release, it may be valuable to look at the differences with the previous
 version and test the resources that are thought to affect the lifecycle. Some
 different tools can be used to automate this process. For example, the output of
@@ -148,34 +138,32 @@ resources can be identified, and Uptest jobs can be triggered on them.
 uptest diff-test --source v1.2.0 --diff-source git --data-source="${UPTEST_DATASOURCE_PATH}" --setup-script=cluster/test/setup.sh --default-conditions="Test"
 ```
 
-### Connection Details Included Tests
+### Connection details tests
 
-`Connection Details`, one of the key points that Crossplane provides is that
-when a provider creates a managed resource, the resource can create
-resource-specific details. These details can include usernames, passwords, or
-connection details such as IP address. Such details are vital for the user to
-access and use the provisioned resource. Uptest does not perform any tests on
-`Connection Details` of such resources today.
+`Connection Details`, are one of the key points Crossplane provides when a
+provider creates a managed resource. The resource can create resource-specific
+details including usernames, passwords, or connection details such as an IP
+address. Such details are vital for the user to access and use the provisioned
+resource. Uptest does not perform any tests on `Connection Details` of such
+resources today.
 
-For example, when a `Cluster` is provisioned on a `provider-gcp`, the
-connection details of this cluster are in a secret. Whether the value in this
-secret is properly populated or not is actually of the same importance as
-whether the resource is Ready or not.
+For example, when a `Cluster` is provisioned through `provider-gcp`, the
+connection details of this cluster are stored in a secret. Whether the value in
+this secret is properly populated or not is of the same importance as whether
+the resource is Ready or not.
 
 For this reason, a test step that checks the `Connection Details` can be added
-for some resources. These test steps can be manipulated with various hooks.
-Basically, the CLI of the relevant provider can be used here. At this point,
-it should be noted that this will be a custom step for frequently used resources
-rather than a generic step, but it can be a good point in terms of increasing
-test coverage.
+for resources. These test steps can be manipulated with various hooks.
+Basically, the CLI of the relevant provider can be used here. At this point, it
+should be noted that this will be a custom step for frequently used resources
+rather than a generic step.
 
-The `Import` and `Update` steps are managed through the annotations in the
-example manifests. It would be appropriate to consider Connection Details as a
-similar step and manage it through annotations for the resources that are
-desired to run. As a default behavior, the `Connection-Details` step will not
-run. This step can be executed if the annotation is set in the related example.
-The secret field values to be checked in the related annotation can be
-specified. For example:
+The annotations in the example manifests manage the `Import` and `Update` steps.
+It would be appropriate to consider `Connection Details` as a similar step and
+manage it through annotations for the desired resources. As a default behavior,
+the `Connection Details` step will not run. This step can be executed if the
+annotation is set in the related example. The secret field values to be checked
+in the related annotation can be specified. For example:
 
 ```yaml
 apiVersion: rds.aws.upbound.io/v1beta1
@@ -203,30 +191,15 @@ spec:
 
 Related Issue: https://github.com/upbound/official-providers-ci/issues/82
 
-### Real-Life Scenarios / Composition Testing
-
-Although Uptest has the ability to perform Claim tests, MRs are tested on a
-provider basis. However, Crossplane users often use higher-level abstractions
-such as `Compositions` and `Claims`. At the end of the day, these can be reduced
-to MRs, and it can even be said that providers are only responsible for the
-lifecycle of MRs. However, some situations are only observed when such
-higher-level abstractions are used. Therefore, it may make sense to use
-real-life scenarios in order to catch some bugs and problems in advance and
-increase test convergence.
-
-Here, imitating various user environments or creating configurations similar
-to reference platforms can be a start.
-
 ### ProviderConfig Coverage
 
-As it is known, Uptest uses only `Secret` source `ProviderConfig` in its tests.
-However, crossplane providers allow many different provider configuration
-mechanisms (`IRSA`, `WebIdentitiy`, etc.). For this reason, especially the
-changes made in this context are tested manually and there is difficulty in
-preparing the environments locally. At this point, testing different
-`ProviderConfig` sources will significantly increase provider test coverage. It
-will also make things easier for this and similar cases that are difficult to
-test locally.
+Uptest only uses the `Secret` source from the `ProviderConfig` in its tests.
+However, Crossplane providers allow many different provider configuration
+mechanisms (`IRSA`, `WebIdentitiy`, etc.). For this reason, changes made in
+this context are tested manually and there is difficulty in preparing the
+environments locally. Testing different `ProviderConfig` sources will
+significantly increase provider test coverage. It will also improve the ability
+to test changes locally.
 
 By default, `Secret` source is still used, but a specific provider config
 manifest can be applied to the cluster via a CLI flag:
@@ -237,11 +210,11 @@ uptest e2e --provider-config="examples/irsa-config.yaml" --data-source="${UPTEST
 
 ### More Comprehensive Test Assertions
 
-`Uptest` focuses on the status conditions of the crossplane resources. For
-example, during a test of MR, the `Uptest` checks the `UpToDate` condition and
-does not look to the fields of the created resources. Doing more comprehensive
-assertions like comparing the values of the fields in spec and status of MRs and
-validating patch steps for Compositions will increase the test coverage.
+`Uptest` focuses on the status conditions of the Crossplane resources. For
+example, during a test of MR, Uptest checks the `UpToDate` condition and does
+not look at the fields of the created resources. Doing more comprehensive
+assertions like comparing the values of the fields in the spec and status of MRs
+and validating patch steps for Compositions will increase the test coverage.
 
 Comparisons can be made here using Crossplane's `fieldpath` library. The set of
 fields in `status.AtProvider` has, with recent changes, become a set that
@@ -286,21 +259,21 @@ Related Issue: https://github.com/upbound/official-providers-ci/issues/175
 
 ### Mocking Providers
 
-`Uptest` provisions physical resources while running tests on providers. In some
+Uptest provisions physical resources while running tests on providers. In some
 cases, users may want to run their tests on a mock system. Mocking providers is
-not directly the subject of `Uptest`, but enabling some existing mock
-infrastructures is the point of `Uptest`.
+not directly the subject of Uptest, but enabling Uptest to run against existing
+mock infrastructures will be beneficial.
 
-For example, [localstack](https://github.com/localstack/localstack) is a cloud
+For example, [Localstack](https://github.com/localstack/localstack) is a cloud
 service emulator that runs in a single container on your laptop or in your CI
 environment. With LocalStack, you can run your AWS applications or Lambdas
 entirely on your local machine without connecting to a remote cloud provider.
 
-Currently, there is an infrastructure for localstack in `provider-aws`. If
+Currently, there is an ability to use LocalStack in `provider-aws`. If
 `ProviderConfig` is configured properly, it will be possible to perform the
-relevant tests in a mock way. Therefore, increasing the `ProviderConfig`
-coverage mentioned before and even allowing custom configurations is at a
-critical point in this context.
+relevant tests in a mocked way. Therefore, increasing the `ProviderConfig`
+coverage mentioned before and even allowing custom configurations is key to
+unlocking this capability.
 
 ```shell
 uptest e2e --provider-config="examples/localstack-config.yaml" --data-source="${UPTEST_DATASOURCE_PATH}" --setup-script=cluster/test/setup.sh --default-conditions="Test"
@@ -328,17 +301,6 @@ https://github.com/upbound/official-providers-ci/issues/4
 
 ### Creating End User Documentation
 
-A detailed user document in which Uptest's use cases are introduced and usages
-are summarized will be found very useful by users. The main purpose of this type
-of document is not to talk about detailed technical discussions but to explain
-how to use the tool. A guide prepared in this context will also be very useful
-for teams that are in direct communication with users.
-
-## Conclusion
-
-The Uptest tool has reached this form as a result of all the stages it has gone
-through. It will become stronger with the items mentioned above and become a
-more stable tool. This is essential to increase both test coverage and quality.
-It is also valuable in terms of shortening manual processes and reducing manual
-time spent on tests in the long term.
-
+Detailed documentation in which Uptest's use cases and instructions are
+summarized is needed by end users. The main purpose of this type of document is
+to explain how to use the tool.
