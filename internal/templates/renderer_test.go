@@ -110,12 +110,15 @@ commands:
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
+- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 
 					"03-assert.yaml": `# This assert file belongs to the resource delete step.
@@ -217,12 +220,15 @@ commands:
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
+- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 					"03-assert.yaml": `# This assert file belongs to the resource delete step.
 apiVersion: kuttl.dev/v1beta1
@@ -327,12 +333,15 @@ commands:
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
+- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
 			},
@@ -417,12 +426,15 @@ commands:
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
+- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
 			},
@@ -507,12 +519,15 @@ commands:
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
+- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
 			},
