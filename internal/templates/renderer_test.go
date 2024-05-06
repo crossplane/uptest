@@ -131,12 +131,6 @@ commands:
           echo "$endpoint - Ports present"
         fi
       done
-
-      if ${KUBECTL} get managed ; then
-          return 0
-      else
-          return 1
-      fi
     }
 
     attempt=1
@@ -153,8 +147,52 @@ commands:
     done
 
     exit 1
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: |
+    #!/bin/bash
+
+    function patch {
+        kindgroup=$1
+        name=$2
+        if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    attempt=1
+    max_attempts=10
+
+    # Array of resources
+    resources=(
+        "s3.aws.upbound.io/example-bucket"
+    )
+
+    for resource in "${resources[@]}"; do
+        kindgroup=$(echo "$resource" | cut -d '/' -f 1)
+        name=$(echo "$resource" | cut -d '/' -f 2)
+
+        attempt=1
+        while [[ $attempt -le $max_attempts ]]; do
+            if patch "$kindgroup" "$name"; then
+                echo "Successfully patched $kindgroup/$name"
+                ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
+                break
+            else
+                printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
+            fi
+            ((attempt++))
+            sleep 5
+        done
+
+        if [[ $attempt -gt $max_attempts ]]; then
+            echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
+            exit 1
+        fi
+    done
+
+    echo "All resources patched successfully."
+    exit 0
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 
@@ -278,12 +316,6 @@ commands:
           echo "$endpoint - Ports present"
         fi
       done
-
-      if ${KUBECTL} get managed ; then
-          return 0
-      else
-          return 1
-      fi
     }
 
     attempt=1
@@ -300,8 +332,52 @@ commands:
     done
 
     exit 1
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: |
+    #!/bin/bash
+
+    function patch {
+        kindgroup=$1
+        name=$2
+        if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    attempt=1
+    max_attempts=10
+
+    # Array of resources
+    resources=(
+        "s3.aws.upbound.io/example-bucket"
+    )
+
+    for resource in "${resources[@]}"; do
+        kindgroup=$(echo "$resource" | cut -d '/' -f 1)
+        name=$(echo "$resource" | cut -d '/' -f 2)
+
+        attempt=1
+        while [[ $attempt -le $max_attempts ]]; do
+            if patch "$kindgroup" "$name"; then
+                echo "Successfully patched $kindgroup/$name"
+                ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
+                break
+            else
+                printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
+            fi
+            ((attempt++))
+            sleep 5
+        done
+
+        if [[ $attempt -gt $max_attempts ]]; then
+            echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
+            exit 1
+        fi
+    done
+
+    echo "All resources patched successfully."
+    exit 0
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 					"03-assert.yaml": `# This assert file belongs to the resource delete step.
@@ -428,12 +504,6 @@ commands:
           echo "$endpoint - Ports present"
         fi
       done
-
-      if ${KUBECTL} get managed ; then
-          return 0
-      else
-          return 1
-      fi
     }
 
     attempt=1
@@ -450,8 +520,52 @@ commands:
     done
 
     exit 1
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: |
+    #!/bin/bash
+
+    function patch {
+        kindgroup=$1
+        name=$2
+        if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    attempt=1
+    max_attempts=10
+
+    # Array of resources
+    resources=(
+        "s3.aws.upbound.io/example-bucket"
+    )
+
+    for resource in "${resources[@]}"; do
+        kindgroup=$(echo "$resource" | cut -d '/' -f 1)
+        name=$(echo "$resource" | cut -d '/' -f 2)
+
+        attempt=1
+        while [[ $attempt -le $max_attempts ]]; do
+            if patch "$kindgroup" "$name"; then
+                echo "Successfully patched $kindgroup/$name"
+                ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
+                break
+            else
+                printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
+            fi
+            ((attempt++))
+            sleep 5
+        done
+
+        if [[ $attempt -gt $max_attempts ]]; then
+            echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
+            exit 1
+        fi
+    done
+
+    echo "All resources patched successfully."
+    exit 0
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
@@ -558,12 +672,6 @@ commands:
           echo "$endpoint - Ports present"
         fi
       done
-
-      if ${KUBECTL} get managed ; then
-          return 0
-      else
-          return 1
-      fi
     }
 
     attempt=1
@@ -580,8 +688,52 @@ commands:
     done
 
     exit 1
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: |
+    #!/bin/bash
+
+    function patch {
+        kindgroup=$1
+        name=$2
+        if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    attempt=1
+    max_attempts=10
+
+    # Array of resources
+    resources=(
+        "s3.aws.upbound.io/example-bucket"
+    )
+
+    for resource in "${resources[@]}"; do
+        kindgroup=$(echo "$resource" | cut -d '/' -f 1)
+        name=$(echo "$resource" | cut -d '/' -f 2)
+
+        attempt=1
+        while [[ $attempt -le $max_attempts ]]; do
+            if patch "$kindgroup" "$name"; then
+                echo "Successfully patched $kindgroup/$name"
+                ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
+                break
+            else
+                printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
+            fi
+            ((attempt++))
+            sleep 5
+        done
+
+        if [[ $attempt -gt $max_attempts ]]; then
+            echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
+            exit 1
+        fi
+    done
+
+    echo "All resources patched successfully."
+    exit 0
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
@@ -688,12 +840,6 @@ commands:
           echo "$endpoint - Ports present"
         fi
       done
-
-      if ${KUBECTL} get managed ; then
-          return 0
-      else
-          return 1
-      fi
     }
 
     attempt=1
@@ -710,8 +856,52 @@ commands:
     done
 
     exit 1
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: |
+    #!/bin/bash
+
+    function patch {
+        kindgroup=$1
+        name=$2
+        if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    attempt=1
+    max_attempts=10
+
+    # Array of resources
+    resources=(
+        "s3.aws.upbound.io/example-bucket"
+    )
+
+    for resource in "${resources[@]}"; do
+        kindgroup=$(echo "$resource" | cut -d '/' -f 1)
+        name=$(echo "$resource" | cut -d '/' -f 2)
+
+        attempt=1
+        while [[ $attempt -le $max_attempts ]]; do
+            if patch "$kindgroup" "$name"; then
+                echo "Successfully patched $kindgroup/$name"
+                ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
+                break
+            else
+                printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
+            fi
+            ((attempt++))
+            sleep 5
+        done
+
+        if [[ $attempt -gt $max_attempts ]]; then
+            echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
+            exit 1
+        fi
+    done
+
+    echo "All resources patched successfully."
+    exit 0
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
