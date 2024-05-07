@@ -116,9 +116,10 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
+- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 
@@ -227,9 +228,10 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
+- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 					"03-assert.yaml": `# This assert file belongs to the resource delete step.
@@ -341,9 +343,10 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
+- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
@@ -435,9 +438,10 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
+- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},
@@ -529,9 +533,10 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
-- command: ${KUBECTL} --subresource=status patch s3.aws.upbound.io/example-bucket --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate s3.aws.upbound.io/example-bucket uptest-old-id=$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
+- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
 `,
 				},

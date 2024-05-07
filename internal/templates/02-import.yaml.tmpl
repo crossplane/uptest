@@ -8,14 +8,15 @@ commands:
 - command: sleep 10
 - command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
 - script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get pods --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} wait pods --for=condition=Ready --timeout=60s
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+- script: /tmp/check_endpoints.sh
 {{- range $resource := .Resources }}
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
 {{- if not $resource.Namespace }}
-- command: ${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"status":{"conditions":[]}}'
-- script: ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} uptest-old-id=$(${KUBECTL} get {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider.id}') --overwrite
+- script: /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
 {{- end }}
 {{- end }}
 - command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
