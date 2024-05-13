@@ -2,7 +2,7 @@
 
 * Owner: Sergen Yalcin (@sergenyalcin)
 * Reviewers: Uptest Maintainers
-* Status: Draft
+* Status: Accepted
 
 ## Background
 
