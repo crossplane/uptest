@@ -5,7 +5,6 @@
 package templates
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -161,78 +160,19 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
         duration: 10s
     - script:
         content: |
-          function check_endpoints {
-            endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
-            for endpoint in ${endpoints[@]}; do
-                port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-                if [[ -z "${port}" ]]; then
-                    echo "$endpoint - No served ports"
-                    return 1
-                else
-                    echo "$endpoint - Ports present"
-                fi
-            done
-          }
-
-          function check_endpoints_main {
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                if check_endpoints; then
-                    return 0
-                else
-                    printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
-                fi
-                ((attempt++))
-                sleep 5
-              done
-              return 1
-          }
-
-          function patch {
-              kindgroup=$1;
-              name=$2;
-              if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
-                  return 0;
-              else
-                  return 1;
-              fi;
-          };
-
-          function patch_main {
-              kindgroup=$1
-              name=$2
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                  if patch "$kindgroup" "$name"; then
-                      echo "Successfully patched $kindgroup/$name"
-                      ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
-                      break
-                  else
-                      printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
-                  fi
-                  ((attempt++))
-                  sleep 5
-              done
-              if [[ $attempt -gt $max_attempts ]]; then
-                  echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
-                  return 1
-              fi
-              return 0
-          }
-
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          check_endpoints_main
-          patch_main s3.aws.upbound.io example-bucket
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
@@ -265,8 +205,7 @@ metadata:
   name: delete
 spec:
   timeouts:
-    assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Delete Resources
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
@@ -424,78 +363,19 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
         duration: 10s
     - script:
         content: |
-          function check_endpoints {
-            endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
-            for endpoint in ${endpoints[@]}; do
-                port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-                if [[ -z "${port}" ]]; then
-                    echo "$endpoint - No served ports"
-                    return 1
-                else
-                    echo "$endpoint - Ports present"
-                fi
-            done
-          }
-
-          function check_endpoints_main {
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                if check_endpoints; then
-                    return 0
-                else
-                    printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
-                fi
-                ((attempt++))
-                sleep 5
-              done
-              return 1
-          }
-
-          function patch {
-              kindgroup=$1;
-              name=$2;
-              if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
-                  return 0;
-              else
-                  return 1;
-              fi;
-          };
-
-          function patch_main {
-              kindgroup=$1
-              name=$2
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                  if patch "$kindgroup" "$name"; then
-                      echo "Successfully patched $kindgroup/$name"
-                      ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
-                      break
-                  else
-                      printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
-                  fi
-                  ((attempt++))
-                  sleep 5
-              done
-              if [[ $attempt -gt $max_attempts ]]; then
-                  echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
-                  return 1
-              fi
-              return 0
-          }
-
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          check_endpoints_main
-          patch_main s3.aws.upbound.io example-bucket
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
@@ -528,8 +408,7 @@ metadata:
   name: delete
 spec:
   timeouts:
-    assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Delete Resources
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
@@ -690,78 +569,19 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
         duration: 10s
     - script:
         content: |
-          function check_endpoints {
-            endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
-            for endpoint in ${endpoints[@]}; do
-                port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-                if [[ -z "${port}" ]]; then
-                    echo "$endpoint - No served ports"
-                    return 1
-                else
-                    echo "$endpoint - Ports present"
-                fi
-            done
-          }
-
-          function check_endpoints_main {
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                if check_endpoints; then
-                    return 0
-                else
-                    printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
-                fi
-                ((attempt++))
-                sleep 5
-              done
-              return 1
-          }
-
-          function patch {
-              kindgroup=$1;
-              name=$2;
-              if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
-                  return 0;
-              else
-                  return 1;
-              fi;
-          };
-
-          function patch_main {
-              kindgroup=$1
-              name=$2
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                  if patch "$kindgroup" "$name"; then
-                      echo "Successfully patched $kindgroup/$name"
-                      ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
-                      break
-                  else
-                      printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
-                  fi
-                  ((attempt++))
-                  sleep 5
-              done
-              if [[ $attempt -gt $max_attempts ]]; then
-                  echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
-                  return 1
-              fi
-              return 0
-          }
-
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          check_endpoints_main
-          patch_main s3.aws.upbound.io example-bucket
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
@@ -928,78 +748,19 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
         duration: 10s
     - script:
         content: |
-          function check_endpoints {
-            endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
-            for endpoint in ${endpoints[@]}; do
-                port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-                if [[ -z "${port}" ]]; then
-                    echo "$endpoint - No served ports"
-                    return 1
-                else
-                    echo "$endpoint - Ports present"
-                fi
-            done
-          }
-
-          function check_endpoints_main {
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                if check_endpoints; then
-                    return 0
-                else
-                    printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
-                fi
-                ((attempt++))
-                sleep 5
-              done
-              return 1
-          }
-
-          function patch {
-              kindgroup=$1;
-              name=$2;
-              if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
-                  return 0;
-              else
-                  return 1;
-              fi;
-          };
-
-          function patch_main {
-              kindgroup=$1
-              name=$2
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                  if patch "$kindgroup" "$name"; then
-                      echo "Successfully patched $kindgroup/$name"
-                      ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
-                      break
-                  else
-                      printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
-                  fi
-                  ((attempt++))
-                  sleep 5
-              done
-              if [[ $attempt -gt $max_attempts ]]; then
-                  echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
-                  return 1
-              fi
-              return 0
-          }
-
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          check_endpoints_main
-          patch_main s3.aws.upbound.io example-bucket
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
@@ -1157,78 +918,19 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
         duration: 10s
     - script:
         content: |
-          function check_endpoints {
-            endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
-            for endpoint in ${endpoints[@]}; do
-                port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-                if [[ -z "${port}" ]]; then
-                    echo "$endpoint - No served ports"
-                    return 1
-                else
-                    echo "$endpoint - Ports present"
-                fi
-            done
-          }
-
-          function check_endpoints_main {
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                if check_endpoints; then
-                    return 0
-                else
-                    printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
-                fi
-                ((attempt++))
-                sleep 5
-              done
-              return 1
-          }
-
-          function patch {
-              kindgroup=$1;
-              name=$2;
-              if ${KUBECTL} --subresource=status patch "$kindgroup/$name" --type=merge -p '{"status":{"conditions":[]}}' ; then
-                  return 0;
-              else
-                  return 1;
-              fi;
-          };
-
-          function patch_main {
-              kindgroup=$1
-              name=$2
-              attempt=1
-              max_attempts=10
-              while [[ $attempt -le $max_attempts ]]; do
-                  if patch "$kindgroup" "$name"; then
-                      echo "Successfully patched $kindgroup/$name"
-                      ${KUBECTL} annotate "$kindgroup/$name" uptest-old-id=$(${KUBECTL} get "$kindgroup/$name" -o=jsonpath='{.status.atProvider.id}') --overwrite
-                      break
-                  else
-                      printf "Retrying... (%d/%d) for %s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" >&2
-                  fi
-                  ((attempt++))
-                  sleep 5
-              done
-              if [[ $attempt -gt $max_attempts ]]; then
-                  echo "Failed to patch $kindgroup/$name after $max_attempts attempts"
-                  return 1
-              fi
-              return 0
-          }
-
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          check_endpoints_main
-          patch_main s3.aws.upbound.io example-bucket
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
@@ -1261,7 +963,6 @@ spec:
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			got, err := Render(tc.args.tc, tc.args.resources, true)
-			fmt.Println(got)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("Render(...): -want error, +got error:\n%s", diff)
 			}
