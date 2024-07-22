@@ -8,6 +8,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- range $condition := $resource.Conditions }}
 {{- if not $resource.Namespace }}
 - command: ${KUBECTL} wait {{ $resource.KindGroup }}/{{ $resource.Name }} --for=condition={{ $condition }} --timeout 10s

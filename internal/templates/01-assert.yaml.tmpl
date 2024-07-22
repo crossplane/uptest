@@ -8,6 +8,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- if not $resource.Namespace }}
 {{- if $resource.Root }}
 - script: ${KUBECTL} get {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"

@@ -6,6 +6,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- if not $resource.Namespace }}
 {{- if $resource.Root }}
 - command: ${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'

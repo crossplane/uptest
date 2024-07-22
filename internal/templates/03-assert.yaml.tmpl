@@ -9,6 +9,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- if $resource.Namespace }}
 - script: ${KUBECTL} wait {{ $resource.KindGroup }}/{{ $resource.Name }} --for=delete --timeout 10s --namespace {{ $resource.Namespace }}
 {{- else }}

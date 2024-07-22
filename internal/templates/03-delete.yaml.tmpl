@@ -6,6 +6,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- if $resource.PreDeleteScriptPath }}
 - command: {{ $resource.PreDeleteScriptPath }}
 {{- end }}
