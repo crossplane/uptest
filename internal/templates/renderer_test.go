@@ -43,6 +43,12 @@ type: Opaque
 data:
   key: dmFsdWU=
 `
+
+	namespaceManifest = `apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-namespace
+`
 )
 
 func TestRender(t *testing.T) {
@@ -173,6 +179,11 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
+					{
+						YAML:      namespaceManifest,
+						Name:      "test-namespace",
+						KindGroup: "namespace.",
+					},
 				},
 			},
 			want: want{
@@ -182,7 +193,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
 - command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest,
+` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
 					"00-assert.yaml": `# This assert file belongs to the resource apply step.
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
@@ -384,6 +395,11 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
+					{
+						YAML:      namespaceManifest,
+						Name:      "test-namespace",
+						KindGroup: "namespace.",
+					},
 				},
 			},
 			want: want{
@@ -393,7 +409,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
 - command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest,
+` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
 					"00-assert.yaml": `# This assert file belongs to the resource apply step.
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
@@ -478,6 +494,11 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
+					{
+						YAML:      namespaceManifest,
+						Name:      "test-namespace",
+						KindGroup: "namespace.",
+					},
 				},
 			},
 			want: want{
@@ -487,7 +508,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
 - command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest,
+` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
 					"00-assert.yaml": `# This assert file belongs to the resource apply step.
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert

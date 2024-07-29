@@ -15,6 +15,9 @@ commands:
 {{- if eq $resource.KindGroup "secret." -}}
   {{continue}}
 {{- end -}}
+{{- if eq $resource.KindGroup "namespace." -}}
+  {{continue}}
+{{- end -}}
 {{- if not $resource.Namespace }}
 - script: /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
 {{- end }}
