@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function check_endpoints {
-	endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep '^provider-' | awk '{print $1}') )
+	endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep 'provider-' | awk '{print $1}') )
 	for endpoint in ${endpoints[@]}; do
 		port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
 		if [[ -z "${port}" ]]; then
