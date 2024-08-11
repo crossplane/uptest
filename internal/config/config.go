@@ -8,7 +8,6 @@ package config
 import (
 	"time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -52,7 +51,7 @@ type AutomatedTest struct {
 	SetupScriptPath    string
 	TeardownScriptPath string
 
-	DefaultTimeout    v1.Duration
+	DefaultTimeout    time.Duration
 	DefaultConditions []string
 
 	SkipDelete bool
@@ -93,7 +92,7 @@ type Resource struct {
 	APIVersion string
 	Kind       string
 
-	Timeout              v1.Duration
+	Timeout              time.Duration
 	Conditions           []string
 	PreAssertScriptPath  string
 	PostAssertScriptPath string

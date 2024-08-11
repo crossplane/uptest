@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"gopkg.in/alecthomas/kingpin.v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/crossplane/uptest/internal"
 	"github.com/crossplane/uptest/internal/config"
@@ -93,7 +92,7 @@ func e2eTests() {
 		SetupScriptPath:          setupPath,
 		TeardownScriptPath:       teardownPath,
 		DefaultConditions:        strings.Split(*defaultConditions, ","),
-		DefaultTimeout:           v1.Duration{Duration: *defaultTimeout},
+		DefaultTimeout:           *defaultTimeout,
 		Directory:                *testDir,
 		SkipDelete:               *skipDelete,
 		OnlyCleanUptestResources: *onlyCleanUptestResources,

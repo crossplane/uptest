@@ -5,9 +5,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: {{ .TestCase.Timeout }}
     assert: {{ .TestCase.Timeout }}
-    exec: 3m
+    exec: {{ .TestCase.Timeout }}
   steps:
   - name: Remove State
     description: |

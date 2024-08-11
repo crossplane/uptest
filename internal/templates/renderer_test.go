@@ -86,9 +86,9 @@ metadata:
   name: apply
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Run Setup Script
     description: Setup the test environment by running the setup script.
@@ -105,8 +105,8 @@ spec:
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
-      Assert applied resources. Firstly run the pre-assert script if exists.
-      Then check the status conditions. Finally run the post-assert script if
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
       exists.
     try:
     - assert:
@@ -126,9 +126,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Update Root Resource
     description: |
@@ -147,9 +147,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 3m
+    exec: 10m0s
   steps:
   - name: Remove State
     description: |
@@ -273,9 +273,9 @@ metadata:
   name: apply
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Run Setup Script
     description: Setup the test environment by running the setup script.
@@ -292,8 +292,8 @@ spec:
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
-      Assert applied resources. Firstly run the pre-assert script if exists.
-      Then check the status conditions. Finally run the post-assert script if
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
       exists.
     try:
     - command:
@@ -329,9 +329,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Update Root Resource
     description: |
@@ -350,9 +350,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 3m
+    exec: 10m0s
   steps:
   - name: Remove State
     description: |
@@ -495,9 +495,9 @@ metadata:
   name: apply
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Run Setup Script
     description: Setup the test environment by running the setup script.
@@ -514,8 +514,8 @@ spec:
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
-      Assert applied resources. Firstly run the pre-assert script if exists.
-      Then check the status conditions. Finally run the post-assert script if
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
       exists.
     try:
     - assert:
@@ -535,9 +535,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Update Root Resource
     description: |
@@ -556,9 +556,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 3m
+    exec: 10m0s
   steps:
   - name: Remove State
     description: |
@@ -658,9 +658,9 @@ metadata:
   name: apply
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Run Setup Script
     description: Setup the test environment by running the setup script.
@@ -677,8 +677,8 @@ spec:
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
-      Assert applied resources. Firstly run the pre-assert script if exists.
-      Then check the status conditions. Finally run the post-assert script if
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
       exists.
     try:
     - command:
@@ -714,9 +714,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Update Root Resource
     description: |
@@ -735,9 +735,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 3m
+    exec: 10m0s
   steps:
   - name: Remove State
     description: |
@@ -828,9 +828,9 @@ metadata:
   name: apply
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Run Setup Script
     description: Setup the test environment by running the setup script.
@@ -847,8 +847,8 @@ spec:
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
-      Assert applied resources. Firstly run the pre-assert script if exists.
-      Then check the status conditions. Finally run the post-assert script if
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
       exists.
     try:
     - command:
@@ -884,9 +884,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 1m
+    exec: 10m0s
   steps:
   - name: Update Root Resource
     description: |
@@ -905,9 +905,9 @@ metadata:
   name: import
 spec:
   timeouts:
-    apply: 1m
+    apply: 10m0s
     assert: 10m0s
-    exec: 3m
+    exec: 10m0s
   steps:
   - name: Remove State
     description: |

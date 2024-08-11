@@ -5,7 +5,7 @@
 package internal
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -18,7 +18,7 @@ func RunTest(o *config.AutomatedTest) error {
 	if !o.RenderOnly {
 		defer func() {
 			if err := os.RemoveAll(o.Directory); err != nil {
-				fmt.Println(fmt.Sprint(err, "cannot clean the test directory"))
+				log.Printf("Cannot clean the test directory: %s\n", err.Error())
 			}
 		}()
 	}

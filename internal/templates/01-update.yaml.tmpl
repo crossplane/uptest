@@ -5,9 +5,9 @@ metadata:
   name: update
 spec:
   timeouts:
-    apply: 1m
+    apply: {{ .TestCase.Timeout }}
     assert: {{ .TestCase.Timeout }}
-    exec: 1m
+    exec: {{ .TestCase.Timeout }}
   steps:
   - name: Update Root Resource
     description: |

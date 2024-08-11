@@ -6,9 +6,11 @@ package internal
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,8 +18,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
@@ -46,81 +46,101 @@ type tester struct {
 
 func (t *tester) executeTests() error {
 	if err := writeTestFile(t.manifests, t.options.Directory); err != nil {
-		return err
+		return errors.Wrap(err, "cannot write test manifest files")
 	}
 
-	resources, err := t.writeChainsawFiles()
+	resources, timeout, err := t.writeChainsawFiles()
 	if err != nil {
 		return errors.Wrap(err, "cannot write chainsaw test files")
 	}
 
-	fmt.Printf("Written test files: %s\n", t.options.Directory)
+	log.Printf("Written test files: %s\n", t.options.Directory)
 
 	if t.options.RenderOnly {
 		return nil
 	}
 
-	fmt.Println("Running chainsaw tests at " + t.options.Directory)
+	log.Println("Running chainsaw tests at " + t.options.Directory)
+	startTime := time.Now()
 	for _, tf := range testFiles {
 		if !checkFileExists(filepath.Join(t.options.Directory, caseDirectory, tf)) {
+			log.Println("Skipping test " + tf)
 			continue
 		}
-		cmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`, filepath.Join(t.options.Directory, caseDirectory), tf)) // #nosec G204
-		stdout, _ := cmd.StdoutPipe()
-		if err := cmd.Start(); err != nil {
-			return errors.Wrap(err, "cannot start chainsaw")
+		if err := executeSingleTestFile(t, tf, timeout-time.Since(startTime), resources); err != nil {
+			return errors.Wrap(err, "cannot execute test "+tf)
 		}
-
-		var mutex sync.Mutex
-		// Start ticker for kubectl command every 30 seconds
-		ticker := time.NewTicker(t.options.LogCollectionInterval)
-		done := make(chan bool)
-		go logCollector(done, ticker, &mutex, resources)()
-
-		sc := bufio.NewScanner(stdout)
-		sc.Split(bufio.ScanLines)
-		for sc.Scan() {
-			mutex.Lock()
-			fmt.Println(sc.Text())
-			mutex.Unlock()
-		}
-		if err := cmd.Wait(); err != nil {
-			return errors.Wrap(err, "cannot wait for chainsaw")
-		}
-
-		ticker.Stop()
-		done <- true
 	}
 	return nil
 }
 
-func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) func() {
-	return func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				mutex.Lock()
-				fmt.Printf("crossplane trace logs %s\n", time.Now())
-				for _, r := range resources {
-					kubectlCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
-					output, err := kubectlCmd.CombinedOutput()
-					if err != nil {
-						fmt.Println("Error executing crossplane:", err)
-					} else {
-						fmt.Println(string(output))
-					}
+func executeSingleTestFile(t *tester, tf string, timeout time.Duration, resources []config.Resource) error {
+	chainsawCommand := fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`,
+		filepath.Clean(filepath.Join(t.options.Directory, caseDirectory)),
+		filepath.Clean(tf))
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", "-c", chainsawCommand) // #nosec G204
+	stdout, _ := cmd.StdoutPipe()
+	if err := cmd.Start(); err != nil {
+		return errors.Wrapf(err, "cannot start chainsaw: %s", chainsawCommand)
+	}
+
+	// Start ticker for kubectl command every 30 seconds
+	ticker := time.NewTicker(t.options.LogCollectionInterval)
+	done := make(chan bool)
+	defer func() {
+		ticker.Stop()
+		close(done)
+	}()
+
+	var mutex sync.Mutex
+	go logCollector(done, ticker, &mutex, resources)
+
+	sc := bufio.NewScanner(stdout)
+	for sc.Scan() {
+		mutex.Lock()
+		log.Println(sc.Text())
+		mutex.Unlock()
+	}
+	if sc.Err() != nil {
+		return errors.Wrap(sc.Err(), "cannot scan output")
+	}
+	if err := cmd.Wait(); err != nil {
+		return errors.Wrapf(err, "cannot wait for chainsaw: %s", chainsawCommand)
+	}
+
+	return nil
+}
+
+func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			mutex.Lock()
+			log.Printf("crossplane trace logs %s\n", time.Now())
+			for _, r := range resources {
+				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				output, err := traceCmd.CombinedOutput()
+				if err != nil {
+					log.Println("Error executing crossplane:", err)
+				} else {
+					log.Println(string(output))
 				}
-				mutex.Unlock()
 			}
+			mutex.Unlock()
 		}
 	}
+
 }
 
 func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { //nolint:gocyclo // TODO: can we break this?
 	tc := &config.TestCase{
-		Timeout:                  t.options.DefaultTimeout.Duration,
+		Timeout:                  t.options.DefaultTimeout,
 		SetupScriptPath:          t.options.SetupScriptPath,
 		TeardownScriptPath:       t.options.TeardownScriptPath,
 		OnlyCleanUptestResources: t.options.OnlyCleanUptestResources,
@@ -152,9 +172,9 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "timeout value is not valid")
 			}
-			example.Timeout = v1.Duration{Duration: time.Duration(d)}
-			if example.Timeout.Duration > tc.Timeout {
-				tc.Timeout = example.Timeout.Duration
+			example.Timeout = time.Duration(d) * time.Second
+			if example.Timeout > tc.Timeout {
+				tc.Timeout = example.Timeout
 			}
 		}
 
@@ -210,9 +230,11 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 		if exampleID, ok := annotations[config.AnnotationKeyExampleID]; ok {
 			if exampleID == strings.ToLower(fmt.Sprintf("%s/%s/%s", strings.Split(groupVersionKind.Group, ".")[0], groupVersionKind.Version, groupVersionKind.Kind)) {
 				if disableImport == "true" {
+					log.Println("Skipping import step because the root resource has disable import annotation")
 					tc.SkipImport = true
 				}
 				if updateParameter == "" || obj.GetNamespace() != "" {
+					log.Println("Skipping update step because the root resource does not have the update parameter")
 					tc.SkipUpdate = true
 				}
 				example.Root = true
@@ -225,28 +247,28 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 	return tc, examples, nil
 }
 
-func (t *tester) writeChainsawFiles() ([]config.Resource, error) {
+func (t *tester) writeChainsawFiles() ([]config.Resource, time.Duration, error) {
 	tc, examples, err := t.prepareConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build examples config")
+		return nil, 0, errors.Wrap(err, "cannot build examples config")
 	}
 
 	files, err := templates.Render(tc, examples, t.options.SkipDelete)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot render chainsaw templates")
+		return nil, 0, errors.Wrap(err, "cannot render chainsaw templates")
 	}
 
 	for k, v := range files {
 		if err := os.WriteFile(filepath.Join(filepath.Join(t.options.Directory, caseDirectory), k), []byte(v), fs.ModePerm); err != nil {
-			return nil, errors.Wrapf(err, "cannot write file %q", k)
+			return nil, 0, errors.Wrapf(err, "cannot write file %q", k)
 		}
 	}
 
-	return examples, nil
+	return examples, tc.Timeout, nil
 }
 
 func writeTestFile(manifests []config.Manifest, directory string) error {
-	file, err := os.Create(filepath.Join(directory, caseDirectory, "test-input.yaml")) //nolint:gosec // Safe disable of gosec: path components are controlled, mitigating directory traversal risks.
+	file, err := os.Create(filepath.Clean(filepath.Join(directory, caseDirectory, "test-input.yaml")))
 	if err != nil {
 		return err
 	}
@@ -255,10 +277,10 @@ func writeTestFile(manifests []config.Manifest, directory string) error {
 	writer := bufio.NewWriter(file)
 	for _, manifest := range manifests {
 		if _, err := writer.WriteString("---\n"); err != nil {
-			return err
+			return errors.Wrap(err, "cannot write the manifest delimiter")
 		}
 		if _, err = writer.WriteString(manifest.YAML + "\n"); err != nil {
-			return err
+			return errors.Wrap(err, "cannot write the manifest content")
 		}
 	}
 	return writer.Flush()
