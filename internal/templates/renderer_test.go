@@ -87,6 +87,7 @@ kind: TestAssert
 timeout: 10
 commands:
 - command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
+- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
 - script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
 - script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
 - command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
@@ -200,6 +201,7 @@ kind: TestAssert
 timeout: 10
 commands:
 - command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
+- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
 - script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
 - script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
 - command: /tmp/bucket/pre-assert.sh
@@ -319,6 +321,7 @@ kind: TestAssert
 timeout: 10
 commands:
 - command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
+- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
 - script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
 - script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
 - command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
@@ -416,6 +419,7 @@ kind: TestAssert
 timeout: 10
 commands:
 - command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
+- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
 - script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
 - script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
 - command: /tmp/bucket/pre-assert.sh
@@ -515,6 +519,7 @@ kind: TestAssert
 timeout: 10
 commands:
 - command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
+- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
 - script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
 - script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
 - command: /tmp/bucket/pre-assert.sh
