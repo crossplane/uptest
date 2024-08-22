@@ -34,13 +34,17 @@ var (
 	teardownScript = e2e.Flag("teardown-script", "Script that will be executed after running tests.").Default("").String()
 
 	defaultTimeout = e2e.Flag("default-timeout", "Default timeout in seconds for the test.\n"+
-		"Timeout could be overridden per resource using \"uptest.upbound.io/timeout\" annotation.").Default("1200").Int()
+		"Timeout could be overridden per resource using \"uptest.upbound.io/timeout\" annotation.").Default("1200s").Duration()
 	defaultConditions = e2e.Flag("default-conditions", "Comma separated list of default conditions to wait for a successful test.\n"+
 		"Conditions could be overridden per resource using \"uptest.upbound.io/conditions\" annotation.").Default("Ready").String()
 
 	skipDelete               = e2e.Flag("skip-delete", "Skip the delete step of the test.").Default("false").Bool()
-	testDir                  = e2e.Flag("test-directory", "Directory where kuttl test case will be generated and executed.").Envar("UPTEST_TEST_DIR").Default(filepath.Join(os.TempDir(), "uptest-e2e")).String()
+	testDir                  = e2e.Flag("test-directory", "Directory where chainsaw test case will be generated and executed.").Envar("UPTEST_TEST_DIR").Default(filepath.Join(os.TempDir(), "uptest-e2e")).String()
 	onlyCleanUptestResources = e2e.Flag("only-clean-uptest-resources", "While deletion step, only clean resources that were created by uptest").Default("false").Bool()
+
+	renderOnly         = e2e.Flag("render-only", "Only render test files. Do not run the tests.").Default("false").Bool()
+	logCollectInterval = e2e.Flag("log-collect-interval", "Specifies the interval duration for collecting logs. "+
+		"The duration should be provided in a format understood by the tool, such as seconds (s), minutes (m), or hours (h). For example, '30s' for 30 seconds, '5m' for 5 minutes, or '1h' for one hour.").Default("30s").Duration()
 )
 
 func main() {
@@ -92,6 +96,8 @@ func e2eTests() {
 		Directory:                *testDir,
 		SkipDelete:               *skipDelete,
 		OnlyCleanUptestResources: *onlyCleanUptestResources,
+		RenderOnly:               *renderOnly,
+		LogCollectionInterval:    *logCollectInterval,
 	}
 
 	kingpin.FatalIfError(internal.RunTest(o), "cannot run e2e tests successfully")

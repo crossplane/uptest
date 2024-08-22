@@ -1,11 +1,66 @@
 # This file belongs to the resource apply step.
 {{ if .TestCase.SetupScriptPath -}}
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: {{ .TestCase.SetupScriptPath }}
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: {{ .TestCase.Timeout }}
+    assert: {{ .TestCase.Timeout }}
+    exec: {{ .TestCase.Timeout }}
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: {{ .TestCase.SetupScriptPath }}
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: {{ .TestCase.TestDirectory }}
+    - script:
+        content: |
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.Namespace }}
+          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite
+    {{- end }}
+    {{- end }}
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if $resource.PreAssertScriptPath }}
+    - command:
+        entrypoint: {{ $resource.PreAssertScriptPath }}
+    {{- end }}
+    - assert:
+        resource:
+          apiVersion: {{ $resource.APIVersion }}
+          kind: {{ $resource.Kind }}
+          metadata:
+            name: {{ $resource.Name }}
+            {{- if $resource.Namespace }}
+            namespace: {{ $resource.Namespace }}
+            {{- end }}
+          status:
+            {{- range $condition := $resource.Conditions }}
+            ((conditions[?type == '{{ $condition }}'])[0]):
+              status: "True"
+            {{- end }}
+    {{- if $resource.PostAssertScriptPath }}
+    - command:
+        entrypoint: {{ $resource.PostAssertScriptPath }}
+    {{- end }}
+    {{- end }}
 {{ end }}
-{{- range $resource := .Resources -}}
----
-{{ $resource.YAML }}
-{{- end }}

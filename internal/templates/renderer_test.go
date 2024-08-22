@@ -6,6 +6,7 @@ package templates
 
 import (
 	"testing"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -43,12 +44,6 @@ type: Opaque
 data:
   key: dmFsdWU=
 `
-
-	namespaceManifest = `apiVersion: v1
-kind: Namespace
-metadata:
-  name: test-namespace
-`
 )
 
 func TestRender(t *testing.T) {
@@ -67,11 +62,15 @@ func TestRender(t *testing.T) {
 		"SuccessSingleResource": {
 			args: args{
 				tc: &config.TestCase{
-					Timeout: 10,
+					SetupScriptPath: "/tmp/setup.sh",
+					Timeout:         10 * time.Minute,
+					TestDirectory:   "/tmp/test-input.yaml",
 				},
 				resources: []config.Resource{
 					{
 						Name:       "example-bucket",
+						APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:       "Bucket",
 						KindGroup:  "s3.aws.upbound.io",
 						YAML:       bucketManifest,
 						Conditions: []string{"Test"},
@@ -80,71 +79,149 @@ func TestRender(t *testing.T) {
 			},
 			want: want{
 				out: map[string]string{
-					"00-apply.yaml": "# This file belongs to the resource apply step.\n---\n" + bucketManifest,
-					"00-assert.yaml": `# This assert file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
-- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
-- script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
 `,
 					"01-update.yaml": `# This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-`,
-					"01-assert.yaml": `# This assert file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the update assertion step:"; ${KUBECTL} get managed -o yaml
-`,
-					"02-assert.yaml": `# This assert file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the import assertion step:"; ${KUBECTL} get managed -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- script: new_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}')" && old_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.metadata.annotations.uptest-old-id}')" && [ "$new_id" = "$old_id" ]
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
 `,
 					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
-`,
-
-					"03-assert.yaml": `# This assert file belongs to the resource delete step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the delete assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the delete assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=delete --timeout 10s
-- command: ${KUBECTL} wait managed --all --for=delete --timeout 10s
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
 `,
 					"03-delete.yaml": `# This file belongs to the resource delete step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: delete
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Delete Resources
+    description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+  - name: Assert Deletion
+    description: Assert deletion of resources.
+    try:
+    - wait:
+        apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+        kind: Bucket
+        name: example-bucket
+        for:
+          deletion: {}
 `,
 				},
 			},
@@ -152,13 +229,16 @@ commands:
 		"SuccessMultipleResource": {
 			args: args{
 				tc: &config.TestCase{
-					Timeout:            10,
+					Timeout:            10 * time.Minute,
 					SetupScriptPath:    "/tmp/setup.sh",
 					TeardownScriptPath: "/tmp/teardown.sh",
+					TestDirectory:      "/tmp/test-input.yaml",
 				},
 				resources: []config.Resource{
 					{
 						YAML:                 bucketManifest,
+						APIVersion:           "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:                 "Bucket",
 						Name:                 "example-bucket",
 						KindGroup:            "s3.aws.upbound.io",
 						PreAssertScriptPath:  "/tmp/bucket/pre-assert.sh",
@@ -167,6 +247,8 @@ commands:
 					},
 					{
 						YAML:                 claimManifest,
+						APIVersion:           "cluster.gcp.platformref.upbound.io/v1alpha1",
+						Kind:                 "Cluster",
 						Name:                 "test-cluster-claim",
 						KindGroup:            "cluster.gcp.platformref.upbound.io",
 						Namespace:            "upbound-system",
@@ -180,93 +262,181 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
-					{
-						YAML:      namespaceManifest,
-						Name:      "test-namespace",
-						KindGroup: "namespace.",
-					},
 				},
 			},
 			want: want{
 				out: map[string]string{
 					"00-apply.yaml": `# This file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
-					"00-assert.yaml": `# This assert file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
-- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
-- script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: /tmp/bucket/pre-assert.sh
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Ready --timeout 10s --namespace upbound-system
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Synced --timeout 10s --namespace upbound-system
-- command: /tmp/claim/post-assert.sh
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - command:
+        entrypoint: /tmp/bucket/pre-assert.sh
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        resource:
+          apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
+          kind: Cluster
+          metadata:
+            name: test-cluster-claim
+            namespace: upbound-system
+          status:
+            ((conditions[?type == 'Ready'])[0]):
+              status: "True"
+            ((conditions[?type == 'Synced'])[0]):
+              status: "True"
+    - command:
+        entrypoint: /tmp/claim/post-assert.sh
 `,
 					"01-update.yaml": `# This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-`,
-					"01-assert.yaml": `# This assert file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the update assertion step:"; ${KUBECTL} get managed -o yaml
-`,
-					"02-assert.yaml": `# This assert file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the import assertion step:"; ${KUBECTL} get managed -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- script: new_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}')" && old_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.metadata.annotations.uptest-old-id}')" && [ "$new_id" = "$old_id" ]
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
 `,
 					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
-`,
-					"03-assert.yaml": `# This assert file belongs to the resource delete step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the delete assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the delete assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=delete --timeout 10s
-- script: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=delete --timeout 10s --namespace upbound-system
-- command: ${KUBECTL} wait managed --all --for=delete --timeout 10s
-- command: /tmp/teardown.sh
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
 `,
 					"03-delete.yaml": `# This file belongs to the resource delete step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
-- command: /tmp/bucket/post-delete.sh
-- command: /tmp/claim/pre-delete.sh
-- command: ${KUBECTL} delete cluster.gcp.platformref.upbound.io/test-cluster-claim --wait=false --namespace upbound-system --ignore-not-found
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: delete
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Delete Resources
+    description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+          /tmp/bucket/post-delete.sh
+          /tmp/claim/pre-delete.sh
+          ${KUBECTL} delete cluster.gcp.platformref.upbound.io/test-cluster-claim --wait=false --namespace upbound-system --ignore-not-found
+  - name: Assert Deletion
+    description: Assert deletion of resources.
+    try:
+    - wait:
+        apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+        kind: Bucket
+        name: example-bucket
+        for:
+          deletion: {}
+    - wait:
+        apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
+        kind: Cluster
+        name: test-cluster-claim
+        namespace: upbound-system
+        for:
+          deletion: {}
+    - command:
+        entrypoint: /tmp/teardown.sh
 `,
 				},
 			},
@@ -301,11 +471,15 @@ func TestRenderWithSkipDelete(t *testing.T) {
 		"SuccessSingleResource": {
 			args: args{
 				tc: &config.TestCase{
-					Timeout: 10,
+					SetupScriptPath: "/tmp/setup.sh",
+					Timeout:         10 * time.Minute,
+					TestDirectory:   "/tmp/test-input.yaml",
 				},
 				resources: []config.Resource{
 					{
 						Name:       "example-bucket",
+						APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:       "Bucket",
 						KindGroup:  "s3.aws.upbound.io",
 						YAML:       bucketManifest,
 						Conditions: []string{"Test"},
@@ -314,54 +488,124 @@ func TestRenderWithSkipDelete(t *testing.T) {
 			},
 			want: want{
 				out: map[string]string{
-					"00-apply.yaml": "# This file belongs to the resource apply step.\n---\n" + bucketManifest,
-					"00-assert.yaml": `# This assert file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
-- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
-- script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
 `,
 					"01-update.yaml": `# This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-`,
-					"01-assert.yaml": `# This assert file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the update assertion step:"; ${KUBECTL} get managed -o yaml
-`,
-					"02-assert.yaml": `# This assert file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the import assertion step:"; ${KUBECTL} get managed -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- script: new_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}')" && old_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.metadata.annotations.uptest-old-id}')" && [ "$new_id" = "$old_id" ]
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
 `,
 					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
 `,
 				},
 			},
@@ -369,13 +613,16 @@ commands:
 		"SkipImport": {
 			args: args{
 				tc: &config.TestCase{
-					Timeout:            10,
+					Timeout:            10 * time.Minute,
 					SetupScriptPath:    "/tmp/setup.sh",
 					TeardownScriptPath: "/tmp/teardown.sh",
+					TestDirectory:      "/tmp/test-input.yaml",
 				},
 				resources: []config.Resource{
 					{
 						YAML:                 bucketManifest,
+						APIVersion:           "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:                 "Bucket",
 						Name:                 "example-bucket",
 						KindGroup:            "s3.aws.upbound.io",
 						PreAssertScriptPath:  "/tmp/bucket/pre-assert.sh",
@@ -386,6 +633,8 @@ commands:
 					{
 						YAML:                 claimManifest,
 						Name:                 "test-cluster-claim",
+						APIVersion:           "cluster.gcp.platformref.upbound.io/v1alpha1",
+						Kind:                 "Cluster",
 						KindGroup:            "cluster.gcp.platformref.upbound.io",
 						Namespace:            "upbound-system",
 						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
@@ -398,71 +647,136 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
-					{
-						YAML:      namespaceManifest,
-						Name:      "test-namespace",
-						KindGroup: "namespace.",
-					},
 				},
 			},
 			want: want{
 				out: map[string]string{
 					"00-apply.yaml": `# This file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
-					"00-assert.yaml": `# This assert file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
-- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
-- script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: /tmp/bucket/pre-assert.sh
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Ready --timeout 10s --namespace upbound-system
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Synced --timeout 10s --namespace upbound-system
-- command: /tmp/claim/post-assert.sh
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - command:
+        entrypoint: /tmp/bucket/pre-assert.sh
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        resource:
+          apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
+          kind: Cluster
+          metadata:
+            name: test-cluster-claim
+            namespace: upbound-system
+          status:
+            ((conditions[?type == 'Ready'])[0]):
+              status: "True"
+            ((conditions[?type == 'Synced'])[0]):
+              status: "True"
+    - command:
+        entrypoint: /tmp/claim/post-assert.sh
 `,
 					"01-update.yaml": `# This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-`,
-					"01-assert.yaml": `# This assert file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the update assertion step:"; ${KUBECTL} get managed -o yaml
-`,
-					"02-assert.yaml": `# This assert file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the import assertion step:"; ${KUBECTL} get managed -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
 `,
 					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
 `,
 				},
 			},
@@ -470,13 +784,16 @@ commands:
 		"SuccessMultipleResource": {
 			args: args{
 				tc: &config.TestCase{
-					Timeout:            10,
+					Timeout:            10 * time.Minute,
 					SetupScriptPath:    "/tmp/setup.sh",
 					TeardownScriptPath: "/tmp/teardown.sh",
+					TestDirectory:      "/tmp/test-input.yaml",
 				},
 				resources: []config.Resource{
 					{
 						YAML:                 bucketManifest,
+						APIVersion:           "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:                 "Bucket",
 						Name:                 "example-bucket",
 						KindGroup:            "s3.aws.upbound.io",
 						PreAssertScriptPath:  "/tmp/bucket/pre-assert.sh",
@@ -485,6 +802,8 @@ commands:
 					},
 					{
 						YAML:                 claimManifest,
+						APIVersion:           "cluster.gcp.platformref.upbound.io/v1alpha1",
+						Kind:                 "Cluster",
 						Name:                 "test-cluster-claim",
 						KindGroup:            "cluster.gcp.platformref.upbound.io",
 						Namespace:            "upbound-system",
@@ -498,72 +817,144 @@ commands:
 						KindGroup: "secret.",
 						Namespace: "upbound-system",
 					},
-					{
-						YAML:      namespaceManifest,
-						Name:      "test-namespace",
-						KindGroup: "namespace.",
-					},
 				},
 			},
 			want: want{
 				out: map[string]string{
 					"00-apply.yaml": `# This file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: /tmp/setup.sh
-` + "---\n" + bucketManifest + "---\n" + claimManifest + "---\n" + secretManifest + "---\n" + namespaceManifest,
-					"00-assert.yaml": `# This assert file belongs to the resource apply step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- command: ${KUBECTL} annotate managed --all upjet.upbound.io/test=true --overwrite
-- script: if [ -n "${CROSSPLANE_CLI}" ]; then ${KUBECTL} get composite --no-headers -o name | while read -r comp; do [ -n "$comp" ] && ${CROSSPLANE_CLI} beta trace "$comp"; done; fi
-- script: echo "Dump MR manifests for the apply assertion step:"; ${KUBECTL} get managed -o yaml
-- script: echo "Dump Claim manifests for the apply assertion step:" || ${KUBECTL} get claim --all-namespaces -o yaml
-- command: /tmp/bucket/pre-assert.sh
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Ready --timeout 10s --namespace upbound-system
-- command: ${KUBECTL} wait cluster.gcp.platformref.upbound.io/test-cluster-claim --for=condition=Synced --timeout 10s --namespace upbound-system
-- command: /tmp/claim/post-assert.sh
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - command:
+        entrypoint: /tmp/bucket/pre-assert.sh
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        resource:
+          apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
+          kind: Cluster
+          metadata:
+            name: test-cluster-claim
+            namespace: upbound-system
+          status:
+            ((conditions[?type == 'Ready'])[0]):
+              status: "True"
+            ((conditions[?type == 'Synced'])[0]):
+              status: "True"
+    - command:
+        entrypoint: /tmp/claim/post-assert.sh
 `,
 					"01-update.yaml": `# This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-`,
-					"01-assert.yaml": `# This assert file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the update assertion step:"; ${KUBECTL} get managed -o yaml
-`,
-					"02-assert.yaml": `# This assert file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 10
-commands:
-- script: echo "Dump MR manifests for the import assertion step:"; ${KUBECTL} get managed -o yaml
-- command: ${KUBECTL} wait s3.aws.upbound.io/example-bucket --for=condition=Test --timeout 10s
-- script: new_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.status.atProvider.id}')" && old_id="$(${KUBECTL} get s3.aws.upbound.io/example-bucket -o=jsonpath='{.metadata.annotations.uptest-old-id}')" && [ "$new_id" = "$old_id" ]
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
 `,
 					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-- script: /tmp/patch.sh s3.aws.upbound.io example-bucket
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
 `,
 				},
 			},

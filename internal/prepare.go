@@ -4,13 +4,14 @@
 
 // Package internal implements the uptest runtime for running
 // automated tests using resource example manifests
-// using kuttl.
+// using chainsaw.
 package internal
 
 import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -93,7 +94,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 			}
 			if u != nil {
 				if v, ok := u.GetAnnotations()["upjet.upbound.io/manual-intervention"]; ok {
-					fmt.Printf("Skipping %s with name %s since it requires the following manual intervention: %s\n", u.GroupVersionKind().String(), u.GetName(), v)
+					log.Printf("Skipping %s with name %s since it requires the following manual intervention: %s\n", u.GroupVersionKind().String(), u.GetName(), v)
 					continue
 				}
 				y, err := yaml.Marshal(u)

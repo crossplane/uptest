@@ -1,25 +1,89 @@
 # This file belongs to the resource import step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=true --overwrite
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-- command: sleep 10
-- command: ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-- script: ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-- script: curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-- script: /tmp/check_endpoints.sh
-{{- range $resource := .Resources }}
-{{- if eq $resource.KindGroup "secret." -}}
-  {{continue}}
-{{- end -}}
-{{- if eq $resource.KindGroup "namespace." -}}
-  {{continue}}
-{{- end -}}
-{{- if not $resource.Namespace }}
-- script: /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
-{{- end }}
-{{- end }}
-- command: ${KUBECTL} annotate managed --all crossplane.io/paused=false --overwrite
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: {{ .TestCase.Timeout }}
+    assert: {{ .TestCase.Timeout }}
+    exec: {{ .TestCase.Timeout }}
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          {{- range $resource := .Resources }}
+          {{- if eq $resource.KindGroup "secret." -}}
+            {{continue}}
+          {{- end -}}
+          {{- if not $resource.Namespace }}
+          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite
+          {{- end }}
+          {{- end }}
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
+          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          /tmp/check_endpoints.sh
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.Namespace }}
+          /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
+    {{- end }}
+    {{- end }}
+          {{- range $resource := .Resources }}
+          {{- if eq $resource.KindGroup "secret." -}}
+            {{continue}}
+          {{- end -}}
+          {{- if not $resource.Namespace }}
+          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite
+          {{- end }}
+          {{- end }}
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.Namespace }}
+    - assert:
+        resource:
+          apiVersion: {{ $resource.APIVersion }}
+          kind: {{ $resource.Kind }}
+          metadata:
+            name: {{ $resource.Name }}
+          status:
+            {{- range $condition := $resource.Conditions }}
+            ((conditions[?type == '{{ $condition }}'])[0]):
+              status: "True"
+            {{- end }}
+    {{- end }}
+    {{- if not (or $resource.Namespace $resource.SkipImport) }}
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: {{ $resource.APIVersion }}
+          kind: {{ $resource.Kind }}
+          metadata:
+            name: {{ $resource.Name }}
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
+    {{- end }}
+    {{- end }}

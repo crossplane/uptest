@@ -5,7 +5,11 @@
 // Package config contains configuration options for configuring uptest runtime.
 package config
 
-import "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+import (
+	"time"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
 
 const (
 	// AnnotationKeyTimeout defines a test time for the annotated resource.
@@ -47,12 +51,15 @@ type AutomatedTest struct {
 	SetupScriptPath    string
 	TeardownScriptPath string
 
-	DefaultTimeout    int
+	DefaultTimeout    time.Duration
 	DefaultConditions []string
 
 	SkipDelete bool
 
 	OnlyCleanUptestResources bool
+
+	RenderOnly            bool
+	LogCollectionInterval time.Duration
 }
 
 // Manifest represents a resource loaded from an example resource manifest file.
@@ -62,26 +69,30 @@ type Manifest struct {
 	YAML     string
 }
 
-// TestCase represents a test-case to be run by kuttl.
+// TestCase represents a test-case to be run by chainsaw.
 type TestCase struct {
-	Timeout            int
+	Timeout            time.Duration
 	SetupScriptPath    string
 	TeardownScriptPath string
 	SkipUpdate         bool
 	SkipImport         bool
 
 	OnlyCleanUptestResources bool
+
+	TestDirectory string
 }
 
 // Resource represents a Kubernetes object to be tested and asserted
 // by uptest.
 type Resource struct {
-	Name      string
-	Namespace string
-	KindGroup string
-	YAML      string
+	Name       string
+	Namespace  string
+	KindGroup  string
+	YAML       string
+	APIVersion string
+	Kind       string
 
-	Timeout              int
+	Timeout              time.Duration
 	Conditions           []string
 	PreAssertScriptPath  string
 	PostAssertScriptPath string

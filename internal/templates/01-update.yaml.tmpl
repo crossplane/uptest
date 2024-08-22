@@ -1,17 +1,56 @@
 # This file belongs to the resource update step.
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-{{- range $resource := .Resources }}
-{{- if eq $resource.KindGroup "secret." -}}
-  {{continue}}
-{{- end -}}
-{{- if eq $resource.KindGroup "namespace." -}}
-  {{continue}}
-{{- end -}}
-{{- if not $resource.Namespace }}
-{{- if $resource.Root }}
-- command: ${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'
-{{- end }}
-{{- end }}
-{{- end }}
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: update
+spec:
+  timeouts:
+    apply: {{ .TestCase.Timeout }}
+    assert: {{ .TestCase.Timeout }}
+    exec: {{ .TestCase.Timeout }}
+  steps:
+  - name: Update Root Resource
+    description: |
+      Update the root resource by using the specified update-parameter in annotation.
+      Before updating the resources, the status conditions are cleaned.
+    try:
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.Namespace }}
+    {{- if $resource.Root }}
+    - script:
+        content: |
+          ${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"status":{"conditions":[]}}'
+          ${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'
+    {{- end }}
+    {{- end }}
+    {{- end }}
+  - name: Assert Updated Resource
+    description: |
+      Assert update operation. Firstly check the status conditions. Then assert
+      the updated field in status.atProvider.
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.Namespace }}
+    {{- if $resource.Root }}
+    try:
+    - assert:
+        resource:
+          apiVersion: {{ $resource.APIVersion }}
+          kind: {{ $resource.Kind }}
+          metadata:
+            name: {{ $resource.Name }}
+          status:
+            {{- range $condition := $resource.Conditions }}
+            ((conditions[?type == '{{ $condition }}'])[0]):
+              status: "True"
+            {{- end }}
+    - script:
+        content: ${KUBECTL} get {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"
+    {{- end }}
+    {{- end }}
+    {{- end }}
