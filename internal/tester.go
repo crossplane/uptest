@@ -32,6 +32,8 @@ var testFiles = []string{
 	"03-delete.yaml",
 }
 
+const crossplaneTempError = "crossplane: error: cannot get requested resource"
+
 func newTester(ms []config.Manifest, opts *config.AutomatedTest) *tester {
 	return &tester{
 		options:   opts,
@@ -122,14 +124,19 @@ func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resour
 			return
 		case <-ticker.C:
 			mutex.Lock()
-			log.Printf("crossplane trace logs %s\n", time.Now())
 			for _, r := range resources {
 				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
 				output, err := traceCmd.CombinedOutput()
 				if err != nil {
-					log.Println("Error executing crossplane:", err)
+					// During the setup script is running, the crossplane command
+					// is failing because of the resource not found error.
+					// We do not want to show this error to the user because it
+					// is a noise and temporary one.
+					if !strings.Contains(string(output), crossplaneTempError) {
+						log.Printf("crossplane trace logs %s\n%s: %s: %s\n", time.Now(), "Error executing crossplane", err, string(output))
+					}
 				} else {
-					log.Println(string(output))
+					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
 				}
 			}
 			mutex.Unlock()
@@ -148,6 +155,7 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 	}
 	examples := make([]config.Resource, 0, len(t.manifests))
 
+	rootFound := false
 	for _, m := range t.manifests {
 		obj := m.Object
 		groupVersionKind := obj.GroupVersionKind()
@@ -238,10 +246,24 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 					tc.SkipUpdate = true
 				}
 				example.Root = true
+				rootFound = true
 			}
 		}
 
 		examples = append(examples, example)
+	}
+
+	if !rootFound {
+		log.Println("Skipping update step because the root resource does not exist")
+		tc.SkipUpdate = true
+	}
+	if t.options.SkipUpdate {
+		log.Println("Skipping update step because the skip-delete option is set to true")
+		tc.SkipUpdate = true
+	}
+	if t.options.SkipImport {
+		log.Println("Skipping import step because the skip-import option is set to true")
+		tc.SkipImport = true
 	}
 
 	return tc, examples, nil
