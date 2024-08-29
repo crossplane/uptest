@@ -45,6 +45,11 @@ spec:
         for:
           deletion: {}
     {{- end }}
+    {{- if not .TestCase.OnlyCleanUptestResources }}
+    - script:
+        content: |
+          ${KUBECTL} wait managed --all --for=delete --timeout -1s
+    {{- end }}
     {{- if .TestCase.TeardownScriptPath }}
     - command:
         entrypoint: {{ .TestCase.TeardownScriptPath }}

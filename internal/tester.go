@@ -32,8 +32,6 @@ var testFiles = []string{
 	"03-delete.yaml",
 }
 
-const crossplaneTempError = "crossplane: error: cannot get requested resource"
-
 func newTester(ms []config.Manifest, opts *config.AutomatedTest) *tester {
 	return &tester{
 		options:   opts,
@@ -125,24 +123,20 @@ func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resour
 		case <-ticker.C:
 			mutex.Lock()
 			for _, r := range resources {
-				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				// During the setup script is running, the crossplane command
+				// is failing because of the resource not found error.
+				// We do not want to show this error to the user because it
+				// is a noise and temporary one.
+				// The error output was redirected to a file.
+				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
 				output, err := traceCmd.CombinedOutput()
-				if err != nil {
-					// During the setup script is running, the crossplane command
-					// is failing because of the resource not found error.
-					// We do not want to show this error to the user because it
-					// is a noise and temporary one.
-					if !strings.Contains(string(output), crossplaneTempError) {
-						log.Printf("crossplane trace logs %s\n%s: %s: %s\n", time.Now(), "Error executing crossplane", err, string(output))
-					}
-				} else {
+				if err == nil {
 					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
 				}
 			}
 			mutex.Unlock()
 		}
 	}
-
 }
 
 func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { //nolint:gocyclo // TODO: can we break this?
