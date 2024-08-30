@@ -55,6 +55,8 @@ type AutomatedTest struct {
 	DefaultConditions []string
 
 	SkipDelete bool
+	SkipUpdate bool
+	SkipImport bool
 
 	OnlyCleanUptestResources bool
 

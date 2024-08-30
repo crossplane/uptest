@@ -222,6 +222,9 @@ spec:
         name: example-bucket
         for:
           deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait managed --all --for=delete --timeout -1s
 `,
 				},
 			},
@@ -435,6 +438,9 @@ spec:
         namespace: upbound-system
         for:
           deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait managed --all --for=delete --timeout -1s
     - command:
         entrypoint: /tmp/teardown.sh
 `,
