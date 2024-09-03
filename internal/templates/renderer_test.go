@@ -102,6 +102,7 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
+          echo "Runnning annotation script"
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
@@ -292,6 +293,7 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
+          echo "Runnning annotation script"
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
@@ -517,6 +519,7 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
+          echo "Runnning annotation script"
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
@@ -680,6 +683,7 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
+          echo "Runnning annotation script"
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
@@ -850,6 +854,7 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
+          echo "Runnning annotation script"
           ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
@@ -1012,6 +1017,9 @@ spec:
     try:
     - apply:
         file: /tmp/test-input.yaml
+    - script:
+        content: |
+          echo "Runnning annotation script"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1025,6 +1033,104 @@ spec:
           metadata:
             name: test-cluster-claim
             namespace: upbound-system
+          status:
+            ((conditions[?type == 'Ready'])[0]):
+              status: "True"
+            ((conditions[?type == 'Synced'])[0]):
+              status: "True"
+    - command:
+        entrypoint: /tmp/claim/post-assert.sh
+`,
+				},
+			},
+		},
+		"SuccessClaimAndXR": {
+			args: args{
+				tc: &config.TestCase{
+					Timeout:            10 * time.Minute,
+					SetupScriptPath:    "/tmp/setup.sh",
+					TeardownScriptPath: "/tmp/teardown.sh",
+					TestDirectory:      "/tmp/test-input.yaml",
+					SkipUpdate:         true,
+					SkipImport:         true,
+				},
+				resources: []config.Resource{
+					{
+						YAML:                 claimManifest,
+						APIVersion:           "cluster.gcp.platformref.upbound.io/v1alpha1",
+						Kind:                 "Cluster",
+						Name:                 "test-cluster-claim",
+						KindGroup:            "cluster.gcp.platformref.upbound.io",
+						Namespace:            "upbound-system",
+						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
+						PreDeleteScriptPath:  "/tmp/claim/pre-delete.sh",
+						Conditions:           []string{"Ready", "Synced"},
+					},
+					{
+						YAML:                 claimManifest,
+						APIVersion:           "xnetwork.gcp.platformref.upbound.io/v1alpha1",
+						Kind:                 "XNetwork",
+						Name:                 "test-network-xr",
+						KindGroup:            "xnetwork.gcp.platformref.upbound.io",
+						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
+						PreDeleteScriptPath:  "/tmp/claim/pre-delete.sh",
+						Conditions:           []string{"Ready", "Synced"},
+					},
+				},
+			},
+			want: want{
+				out: map[string]string{
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          echo "Runnning annotation script"
+          ${KUBECTL} annotate xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
+          kind: Cluster
+          metadata:
+            name: test-cluster-claim
+            namespace: upbound-system
+          status:
+            ((conditions[?type == 'Ready'])[0]):
+              status: "True"
+            ((conditions[?type == 'Synced'])[0]):
+              status: "True"
+    - command:
+        entrypoint: /tmp/claim/post-assert.sh
+    - assert:
+        resource:
+          apiVersion: xnetwork.gcp.platformref.upbound.io/v1alpha1
+          kind: XNetwork
+          metadata:
+            name: test-network-xr
           status:
             ((conditions[?type == 'Ready'])[0]):
               status: "True"
