@@ -20,15 +20,14 @@ spec:
     try:
     - apply:
         file: {{ .TestCase.TestDirectory }}
+    - script:
+        content: |
+          echo "Runnning annotation script"
     {{- range $i, $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end -}}
     {{- if not $resource.Namespace }}
-    {{- if eq $i 0}}
-    - script:
-        content: |
-    {{- end }}
           ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite
     {{- end }}
     {{- end }}
