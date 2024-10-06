@@ -72,7 +72,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 	if err := os.RemoveAll(caseDirectory); err != nil {
 		return nil, errors.Wrapf(err, "cannot clean directory %s", caseDirectory)
 	}
-	if err := os.MkdirAll(caseDirectory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(caseDirectory, os.ModePerm); err != nil { //nolint:gosec // directory permissions are not critical here
 		return nil, errors.Wrapf(err, "cannot create directory %s", caseDirectory)
 	}
 
