@@ -35,6 +35,11 @@ var (
 	caseDirectory = "case"
 )
 
+type injectedManifest struct {
+	Path     string
+	Manifest string
+}
+
 type preparerOption func(*preparer)
 
 func withDataSource(path string) preparerOption {
@@ -82,8 +87,8 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 	}
 
 	manifests := make([]config.Manifest, 0, len(injectedFiles))
-	for path, data := range injectedFiles {
-		decoder := kyaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(data), 1024)
+	for _, data := range injectedFiles {
+		decoder := kyaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(data.Manifest), 1024)
 		for {
 			u := &unstructured.Unstructured{}
 			if err := decoder.Decode(&u); err != nil {
@@ -102,7 +107,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 					return nil, errors.Wrapf(err, "cannot marshal manifest for \"%s/%s\"", u.GetObjectKind(), u.GetName())
 				}
 				manifests = append(manifests, config.Manifest{
-					FilePath: path,
+					FilePath: data.Path,
 					Object:   u,
 					YAML:     string(y),
 				})
@@ -112,7 +117,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 	return manifests, nil
 }
 
-func (p *preparer) injectVariables() (map[string]string, error) {
+func (p *preparer) injectVariables() ([]injectedManifest, error) {
 	dataSourceMap := make(map[string]string)
 	if p.dataSourcePath != "" {
 		dataSource, err := os.ReadFile(p.dataSourcePath)
@@ -124,13 +129,16 @@ func (p *preparer) injectVariables() (map[string]string, error) {
 		}
 	}
 
-	inputs := make(map[string]string, len(p.testFilePaths))
-	for _, f := range p.testFilePaths {
+	inputs := make([]injectedManifest, len(p.testFilePaths))
+	for i, f := range p.testFilePaths {
 		manifestData, err := os.ReadFile(filepath.Clean(f))
 		if err != nil {
 			return nil, errors.Wrapf(err, "cannot read %s", f)
 		}
-		inputs[f] = p.injectValues(string(manifestData), dataSourceMap)
+		inputs[i] = injectedManifest{
+			Path:     f,
+			Manifest: p.injectValues(string(manifestData), dataSourceMap),
+		}
 	}
 	return inputs, nil
 }
