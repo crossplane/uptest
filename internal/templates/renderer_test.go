@@ -217,12 +217,9 @@ spec:
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
-    - wait:
-        apiVersion: bucket.s3.aws.upbound.io/v1alpha1
-        kind: Bucket
-        name: example-bucket
-        for:
-          deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
@@ -382,12 +379,9 @@ spec:
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
-    - wait:
-        apiVersion: bucket.s3.aws.upbound.io/v1alpha1
-        kind: Bucket
-        name: example-bucket
-        for:
-          deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
@@ -592,19 +586,12 @@ spec:
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
-    - wait:
-        apiVersion: bucket.s3.aws.upbound.io/v1alpha1
-        kind: Bucket
-        name: example-bucket
-        for:
-          deletion: {}
-    - wait:
-        apiVersion: cluster.gcp.platformref.upbound.io/v1alpha1
-        kind: Cluster
-        name: test-cluster-claim
-        namespace: upbound-system
-        for:
-          deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
+    - script:
+        content: |
+          ${KUBECTL} wait --namespace upbound-system --for=delete cluster.gcp.platformref.upbound.io/test-cluster-claim --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
