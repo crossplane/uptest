@@ -35,15 +35,9 @@ spec:
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end }}
-    - wait:
-        apiVersion: {{ $resource.APIVersion }}
-        kind: {{ $resource.Kind }}
-        name: {{ $resource.Name }}
-        {{- if $resource.Namespace }}
-        namespace: {{ $resource.Namespace }}
-        {{- end }}
-        for:
-          deletion: {}
+    - script:
+        content: |
+          ${KUBECTL} wait {{ if $resource.Namespace }} --namespace {{ $resource.Namespace }}{{ end }} --for=delete {{ $resource.Kind }} {{ $resource.Name }} --timeout {{.TestCase.Timeout }}
     {{- end }}
     {{- if not .TestCase.OnlyCleanUptestResources }}
     - script:
