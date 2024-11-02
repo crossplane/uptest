@@ -40,7 +40,7 @@ Args:
 Uptest expects a running control-plane (a.k.a. k8s + crossplane) where required providers are running and/or required
 configuration were applied.
 
-Example run: 
+Example run:
 
 ```shell
 uptest e2e examples/user.yaml,examples/bucket.yaml --setup-script="test/hooks/setup.sh"
@@ -117,9 +117,9 @@ There are 6 types of hooks that can be used to customize the test flow:
 3. `pre-assert-hook`: This hook will be executed before running the assertions and after applying a specific manifest.
     This can be configured via `uptest.upbound.io/pre-assert-hook` annotation on the manifest as a relative path to the
     manifest file.
-4. `post-assert-hook`: This hook will be executed after running the assertions. This can be configured via 
+4. `post-assert-hook`: This hook will be executed after running the assertions. This can be configured via
     `uptest.upbound.io/post-assert-hook` annotation on the manifest as a relative path to the manifest file.
-5. `pre-delete-hook`: This hook will be executed just before deleting the resource. This can be configured via 
+5. `pre-delete-hook`: This hook will be executed just before deleting the resource. This can be configured via
     `uptest.upbound.io/pre-delete-hook` annotation on the manifest as a relative path to the manifest file.
 6. `post-delete-hook`: This hook will be executed right after the resource is deleted. This can be configured via
    `uptest.upbound.io/post-delete-hook` annotation on the manifest as a relative path to the manifest file.
@@ -128,12 +128,21 @@ There are 6 types of hooks that can be used to customize the test flow:
 
 ### Troubleshooting
 
-Uptest uses [kuttl](https://kuttl.dev/) under the hood and generates a `kuttl` test case based on the provided input.
-You can inspect the generated kuttl test case by checking the temporary test directory which is printed in the beginning
-of uptest e2e output. For example:
+Uptest uses [Chainsaw](https://github.com/kyverno/chainsaw) under the hood and generates a `chainsaw` test cases based on the provided input.
+You can render and inspect the generated chainsaws test cases by using uptest
+`--render-only` flag and checking the output directory. For example:
 
 ```shell
-Running kuttl tests at /var/folders/_5/jc7399qx6cn6t5535npv9z4c0000gn/T/uptest-e2e
+uptest e2e examples/kcl/network-xr.yaml --setup-script=test/setup.sh --render-only
+
+2024/11/01 22:20:46 Skipping update step because the root resource does not exist
+2024/11/01 22:20:46 Written test files: /var/folders/sx/0tlfb9ys20bbqnszv3lw12m40000gn/T/uptest-e2e
+
+ls -1 /var/folders/sx/0tlfb9ys20bbqnszv3lw12m40000gn/T/uptest-e2e/case/
+00-apply.yaml
+02-import.yaml
+03-delete.yaml
+test-input.yaml
 ```
 
 ## Report a Bug
