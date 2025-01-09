@@ -12,8 +12,7 @@ import (
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/crossplane/uptest/internal"
-	"github.com/crossplane/uptest/internal/config"
+	"github.com/crossplane/uptest/pkg"
 )
 
 var (
@@ -88,21 +87,23 @@ func e2eTests() {
 			kingpin.FatalIfError(err, "cannot get absolute path of teardown script")
 		}
 	}
-	o := &config.AutomatedTest{
-		ManifestPaths:            examplePaths,
-		DataSourcePath:           *dataSourcePath,
-		SetupScriptPath:          setupPath,
-		TeardownScriptPath:       teardownPath,
-		DefaultConditions:        strings.Split(*defaultConditions, ","),
-		DefaultTimeout:           *defaultTimeout,
-		Directory:                *testDir,
-		SkipDelete:               *skipDelete,
-		SkipUpdate:               *skipUpdate,
-		SkipImport:               *skipImport,
-		OnlyCleanUptestResources: *onlyCleanUptestResources,
-		RenderOnly:               *renderOnly,
-		LogCollectionInterval:    *logCollectInterval,
-	}
 
-	kingpin.FatalIfError(internal.RunTest(o), "cannot run e2e tests successfully")
+	builder := pkg.NewAutomatedTestBuilder()
+	automatedTest := builder.
+		SetManifestPaths(examplePaths).
+		SetDataSourcePath(*dataSourcePath).
+		SetSetupScriptPath(setupPath).
+		SetTeardownScriptPath(teardownPath).
+		SetDefaultConditions(strings.Split(*defaultConditions, ",")).
+		SetDefaultTimeout(*defaultTimeout).
+		SetDirectory(*testDir).
+		SetSkipDelete(*skipDelete).
+		SetSkipUpdate(*skipUpdate).
+		SetSkipImport(*skipImport).
+		SetOnlyCleanUptestResources(*onlyCleanUptestResources).
+		SetRenderOnly(*renderOnly).
+		SetLogCollectionInterval(*logCollectInterval).
+		Build()
+
+	kingpin.FatalIfError(pkg.RunTest(automatedTest), "cannot run e2e tests successfully")
 }

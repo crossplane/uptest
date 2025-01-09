@@ -1,8 +1,4 @@
-// SPDX-FileCopyrightText: 2024 The Crossplane Authors <https://crossplane.io>
-//
-// SPDX-License-Identifier: CC0-1.0
-
-package internal
+package pkg
 
 import (
 	"log"
@@ -10,6 +6,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
+	"github.com/crossplane/uptest/internal"
 	"github.com/crossplane/uptest/internal/config"
 )
 
@@ -24,15 +21,19 @@ func RunTest(o *config.AutomatedTest) error {
 	}
 
 	// Read examples and inject data source values to manifests
-	manifests, err := newPreparer(o.ManifestPaths, withDataSource(o.DataSourcePath), withTestDirectory(o.Directory)).prepareManifests()
+	manifests, err := internal.NewPreparer(o.ManifestPaths, internal.WithDataSource(o.DataSourcePath), internal.WithTestDirectory(o.Directory)).PrepareManifests()
 	if err != nil {
 		return errors.Wrap(err, "cannot prepare manifests")
 	}
 
 	// Prepare assert environment and run tests
-	if err := newTester(manifests, o).executeTests(); err != nil {
+	if err := internal.NewTester(manifests, o).ExecuteTests(); err != nil {
 		return errors.Wrap(err, "cannot execute tests")
 	}
 
 	return nil
+}
+
+func NewAutomatedTestBuilder() *config.Builder {
+	return config.NewBuilder()
 }

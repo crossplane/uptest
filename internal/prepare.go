@@ -40,22 +40,22 @@ type injectedManifest struct {
 	Manifest string
 }
 
-type preparerOption func(*preparer)
+type PreparerOption func(*Preparer)
 
-func withDataSource(path string) preparerOption {
-	return func(p *preparer) {
+func WithDataSource(path string) PreparerOption {
+	return func(p *Preparer) {
 		p.dataSourcePath = path
 	}
 }
 
-func withTestDirectory(path string) preparerOption {
-	return func(p *preparer) {
+func WithTestDirectory(path string) PreparerOption {
+	return func(p *Preparer) {
 		p.testDirectory = path
 	}
 }
 
-func newPreparer(testFilePaths []string, opts ...preparerOption) *preparer {
-	p := &preparer{
+func NewPreparer(testFilePaths []string, opts ...PreparerOption) *Preparer {
+	p := &Preparer{
 		testFilePaths: testFilePaths,
 		testDirectory: os.TempDir(),
 	}
@@ -65,14 +65,14 @@ func newPreparer(testFilePaths []string, opts ...preparerOption) *preparer {
 	return p
 }
 
-type preparer struct {
+type Preparer struct {
 	testFilePaths  []string
 	dataSourcePath string
 	testDirectory  string
 }
 
 //nolint:gocyclo // This function is not complex, gocyclo threshold was reached due to the error handling.
-func (p *preparer) prepareManifests() ([]config.Manifest, error) {
+func (p *Preparer) PrepareManifests() ([]config.Manifest, error) {
 	caseDirectory := filepath.Join(p.testDirectory, caseDirectory)
 	if err := os.RemoveAll(caseDirectory); err != nil {
 		return nil, errors.Wrapf(err, "cannot clean directory %s", caseDirectory)
@@ -117,7 +117,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 	return manifests, nil
 }
 
-func (p *preparer) injectVariables() ([]injectedManifest, error) {
+func (p *Preparer) injectVariables() ([]injectedManifest, error) {
 	dataSourceMap := make(map[string]string)
 	if p.dataSourcePath != "" {
 		dataSource, err := os.ReadFile(p.dataSourcePath)
@@ -143,7 +143,7 @@ func (p *preparer) injectVariables() ([]injectedManifest, error) {
 	return inputs, nil
 }
 
-func (p *preparer) injectValues(manifestData string, dataSourceMap map[string]string) string {
+func (p *Preparer) injectValues(manifestData string, dataSourceMap map[string]string) string {
 	// Inject data source values such as tenantID, objectID, accountID
 	dataSourceKeys := dataSourceRegex.FindAllStringSubmatch(manifestData, -1)
 	for _, dataSourceKey := range dataSourceKeys {
