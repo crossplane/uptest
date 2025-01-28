@@ -40,39 +40,53 @@ type injectedManifest struct {
 	Manifest string
 }
 
-type preparerOption func(*preparer)
+// PreparerOption is a functional option type for configuring a Preparer.
+type PreparerOption func(*Preparer)
 
-func withDataSource(path string) preparerOption {
-	return func(p *preparer) {
+// WithDataSource is a functional option that sets the data source path for the Preparer.
+func WithDataSource(path string) PreparerOption {
+	return func(p *Preparer) {
 		p.dataSourcePath = path
 	}
 }
 
-func withTestDirectory(path string) preparerOption {
-	return func(p *preparer) {
+// WithTestDirectory is a functional option that sets the test directory for the Preparer.
+func WithTestDirectory(path string) PreparerOption {
+	return func(p *Preparer) {
 		p.testDirectory = path
 	}
 }
 
-func newPreparer(testFilePaths []string, opts ...preparerOption) *preparer {
-	p := &preparer{
+// NewPreparer creates a new Preparer instance with the provided test file paths and optional configurations.
+// It applies any provided PreparerOption functions to customize the Preparer.
+func NewPreparer(testFilePaths []string, opts ...PreparerOption) *Preparer {
+	p := &Preparer{
 		testFilePaths: testFilePaths,
-		testDirectory: os.TempDir(),
+		testDirectory: os.TempDir(), // Default test directory is the system's temporary directory.
 	}
+	// Apply each provided option to configure the Preparer.
 	for _, f := range opts {
 		f(p)
 	}
 	return p
 }
 
-type preparer struct {
-	testFilePaths  []string
-	dataSourcePath string
-	testDirectory  string
+// Preparer represents a structure used to prepare testing environments or configurations.
+type Preparer struct {
+	testFilePaths  []string // Paths to the test files.
+	dataSourcePath string   // Path to the data source file.
+	testDirectory  string   // Directory where tests will be executed.
 }
 
+// PrepareManifests prepares and processes manifests from test files.
+// It performs the following steps:
+// 1. Cleans and recreates the case directory.
+// 2. Injects variables into test files.
+// 3. Decodes, processes, and validates each manifest file, skipping any that require manual intervention.
+// 4. Returns the processed manifests or an error if any step fails.
+//
 //nolint:gocyclo // This function is not complex, gocyclo threshold was reached due to the error handling.
-func (p *preparer) prepareManifests() ([]config.Manifest, error) {
+func (p *Preparer) PrepareManifests() ([]config.Manifest, error) {
 	caseDirectory := filepath.Join(p.testDirectory, caseDirectory)
 	if err := os.RemoveAll(caseDirectory); err != nil {
 		return nil, errors.Wrapf(err, "cannot clean directory %s", caseDirectory)
@@ -117,7 +131,7 @@ func (p *preparer) prepareManifests() ([]config.Manifest, error) {
 	return manifests, nil
 }
 
-func (p *preparer) injectVariables() ([]injectedManifest, error) {
+func (p *Preparer) injectVariables() ([]injectedManifest, error) {
 	dataSourceMap := make(map[string]string)
 	if p.dataSourcePath != "" {
 		dataSource, err := os.ReadFile(p.dataSourcePath)
@@ -143,7 +157,7 @@ func (p *preparer) injectVariables() ([]injectedManifest, error) {
 	return inputs, nil
 }
 
-func (p *preparer) injectValues(manifestData string, dataSourceMap map[string]string) string {
+func (p *Preparer) injectValues(manifestData string, dataSourceMap map[string]string) string {
 	// Inject data source values such as tenantID, objectID, accountID
 	dataSourceKeys := dataSourceRegex.FindAllStringSubmatch(manifestData, -1)
 	for _, dataSourceKey := range dataSourceKeys {

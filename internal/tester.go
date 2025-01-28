@@ -32,19 +32,23 @@ var testFiles = []string{
 	"03-delete.yaml",
 }
 
-func newTester(ms []config.Manifest, opts *config.AutomatedTest) *tester {
-	return &tester{
+// NewTester returns a Tester object.
+func NewTester(ms []config.Manifest, opts *config.AutomatedTest) *Tester {
+	return &Tester{
 		options:   opts,
 		manifests: ms,
 	}
 }
 
-type tester struct {
+// Tester is responsible preparing and storing the test data&configurations,
+// and executing the tests.
+type Tester struct {
 	options   *config.AutomatedTest
 	manifests []config.Manifest
 }
 
-func (t *tester) executeTests() error {
+// ExecuteTests execute tests via chainsaw.
+func (t *Tester) ExecuteTests() error {
 	if err := writeTestFile(t.manifests, t.options.Directory); err != nil {
 		return errors.Wrap(err, "cannot write test manifest files")
 	}
@@ -74,7 +78,7 @@ func (t *tester) executeTests() error {
 	return nil
 }
 
-func executeSingleTestFile(t *tester, tf string, timeout time.Duration, resources []config.Resource) error {
+func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
 	chainsawCommand := fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`,
 		filepath.Clean(filepath.Join(t.options.Directory, caseDirectory)),
 		filepath.Clean(tf))
@@ -139,7 +143,7 @@ func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resour
 	}
 }
 
-func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { //nolint:gocyclo // TODO: can we break this?
+func (t *Tester) prepareConfig() (*config.TestCase, []config.Resource, error) { //nolint:gocyclo // TODO: can we break this?
 	tc := &config.TestCase{
 		Timeout:                  t.options.DefaultTimeout,
 		SetupScriptPath:          t.options.SetupScriptPath,
@@ -263,7 +267,7 @@ func (t *tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 	return tc, examples, nil
 }
 
-func (t *tester) writeChainsawFiles() ([]config.Resource, time.Duration, error) {
+func (t *Tester) writeChainsawFiles() ([]config.Resource, time.Duration, error) {
 	tc, examples, err := t.prepareConfig()
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "cannot build examples config")
