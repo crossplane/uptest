@@ -32,6 +32,7 @@ var testFiles = []string{
 	"03-delete.yaml",
 }
 
+// NewTester returns a Tester object.
 func NewTester(ms []config.Manifest, opts *config.AutomatedTest) *Tester {
 	return &Tester{
 		options:   opts,
@@ -39,11 +40,14 @@ func NewTester(ms []config.Manifest, opts *config.AutomatedTest) *Tester {
 	}
 }
 
+// Tester is responsible preparing and storing the test data&configurations,
+// and executing the tests.
 type Tester struct {
 	options   *config.AutomatedTest
 	manifests []config.Manifest
 }
 
+// ExecuteTests execute tests via chainsaw.
 func (t *Tester) ExecuteTests() error {
 	if err := writeTestFile(t.manifests, t.options.Directory); err != nil {
 		return errors.Wrap(err, "cannot write test manifest files")

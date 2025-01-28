@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 The Crossplane Authors <https://crossplane.io>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+// Package pkg contains configuration options for configuring uptest runtime.
 package pkg
 
 import (
@@ -34,6 +39,7 @@ func RunTest(o *config.AutomatedTest) error {
 	return nil
 }
 
+// NewAutomatedTestBuilder returns a Builder for AutomatedTest object
 func NewAutomatedTestBuilder() *config.Builder {
 	return config.NewBuilder()
 }
