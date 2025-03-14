@@ -12,14 +12,29 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/alecthomas/kong"
+	"github.com/kyverno/chainsaw/pkg/discovery"
+	kconfig "github.com/kyverno/chainsaw/pkg/loaders/config"
+	"github.com/kyverno/chainsaw/pkg/runner"
+	enginecontext "github.com/kyverno/chainsaw/pkg/runner/context"
+	runnerflags "github.com/kyverno/chainsaw/pkg/runner/flags"
+	restutils "github.com/kyverno/chainsaw/pkg/utils/rest"
+	"github.com/kyverno/pkg/ext/output/color"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane/cmd/crank/beta/trace"
 
 	"github.com/crossplane/uptest/internal/config"
 	"github.com/crossplane/uptest/internal/templates"
@@ -79,63 +94,120 @@ func (t *Tester) ExecuteTests() error {
 }
 
 func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
-	chainsawCommand := fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`,
-		filepath.Clean(filepath.Join(t.options.Directory, caseDirectory)),
-		filepath.Clean(tf))
+	// Explicitly Set Controller Logger
+	// because of log.SetLogger(...) was never called;
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	log.Println("Loading default configuration...")
+	configuration, err := kconfig.DefaultConfiguration()
+	if err != nil {
+		return errors.Wrap(err, "failed to load Chainsaw default configuration")
+	}
+	configuration.Spec.Discovery.TestFile = tf
+	configuration.Spec.Execution.Parallel = ptr.To(1)
+	configuration.Spec.Cleanup.SkipDelete = true
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", chainsawCommand) // #nosec G204
-	stdout, _ := cmd.StdoutPipe()
-	if err := cmd.Start(); err != nil {
-		return errors.Wrapf(err, "cannot start chainsaw: %s", chainsawCommand)
+	log.Printf("- Using test file: %s\n", configuration.Spec.Discovery.TestFile)
+	log.Printf("- ApplyTimeout %v\n", configuration.Spec.Timeouts.Apply.Duration)
+	log.Printf("- AssertTimeout %v\n", configuration.Spec.Timeouts.Assert.Duration)
+	log.Printf("- CleanupTimeout %v\n", configuration.Spec.Timeouts.Cleanup.Duration)
+	log.Printf("- DeleteTimeout %v\n", configuration.Spec.Timeouts.Delete.Duration)
+	log.Printf("- ErrorTimeout %v\n", configuration.Spec.Timeouts.Error.Duration)
+	log.Printf("- ExecTimeout %v\n", configuration.Spec.Timeouts.Exec.Duration)
+	log.Printf("- Parallel %d\n", *configuration.Spec.Execution.Parallel)
+	color.Init(false, true)
+
+	log.Println("Loading tests...")
+	tests, err := discovery.DiscoverTests(tf, nil, false, t.options.Directory)
+	if err != nil {
+		return errors.Wrap(err, "failed to discover test cases")
 	}
 
-	// Start ticker for kubectl command every 30 seconds
+	var testToRun []discovery.Test
+	for _, test := range tests {
+		if test.Err != nil {
+			log.Printf("- %s (%s) - (%s)\n", test.Test.Name, test.BasePath, test.Err)
+		} else {
+			log.Printf("- %s (%s)\n", test.Test.Name, test.BasePath)
+			testToRun = append(testToRun, test)
+		}
+	}
+
+	log.Println("Running tests...")
+	overrides := clientcmd.ConfigOverrides{}
+	restConfig, err := restutils.DefaultConfig(overrides)
+	if err != nil {
+		return errors.Wrap(err, "failed to load Kubernetes config")
+	}
+
+	tc, err := enginecontext.InitContext(configuration.Spec, restConfig, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize execution context")
+	}
+
+	clock := clock.RealClock{}
+	onFailure := func() {
+		log.Println("Test failed.")
+	}
+
+	runner := runner.New(clock, onFailure)
+
 	ticker := time.NewTicker(t.options.LogCollectionInterval)
 	done := make(chan bool)
+	var mutex sync.Mutex
 	defer func() {
 		ticker.Stop()
 		close(done)
 	}()
 
-	var mutex sync.Mutex
 	go logCollector(done, ticker, &mutex, resources)
 
-	sc := bufio.NewScanner(stdout)
-	for sc.Scan() {
-		mutex.Lock()
-		log.Println(sc.Text())
-		mutex.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := runnerflags.SetupFlags(configuration.Spec); err != nil {
+		return err
 	}
-	if sc.Err() != nil {
-		return errors.Wrap(sc.Err(), "cannot scan output")
+	err = runner.Run(ctx, configuration.Spec.Namespace, tc, testToRun...)
+	if err != nil {
+		return errors.Wrap(err, "test execution failed")
 	}
-	if err := cmd.Wait(); err != nil {
-		return errors.Wrapf(err, "cannot wait for chainsaw: %s", chainsawCommand)
+
+	log.Println("Tests Summary:")
+	log.Printf("- Passed: %d\n", tc.Passed())
+	log.Printf("- Failed: %d\n", tc.Failed())
+	log.Printf("- Skipped: %d\n", tc.Skipped())
+
+	if tc.Failed() > 0 {
+		return errors.New("some tests failed")
 	}
 
 	return nil
 }
 
 func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+	logger := logging.NewNopLogger()
 	for {
 		select {
 		case <-done:
 			return
 		case <-ticker.C:
 			mutex.Lock()
+
+			kongParser := kong.Must(&trace.Cmd{})
+			kongCtx := &kong.Context{
+				Kong: kongParser,
+			}
+
 			for _, r := range resources {
-				// During the setup script is running, the crossplane command
-				// is failing because of the resource not found error.
-				// We do not want to show this error to the user because it
-				// is a noise and temporary one.
-				// The error output was redirected to a file.
-				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
-				output, err := traceCmd.CombinedOutput()
-				if err == nil {
-					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
+				traceCmd := trace.Cmd{
+					Resource: r.KindGroup,
+					Name:     r.Name,
+					Output:   "wide",
+				}
+
+				if err := traceCmd.Run(kongCtx, logger); err != nil {
+					continue
 				}
 			}
 			mutex.Unlock()
