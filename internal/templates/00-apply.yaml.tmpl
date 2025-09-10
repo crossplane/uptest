@@ -27,10 +27,8 @@ spec:
     {{- range $i, $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
-    {{- end -}}
-    {{- if not $resource.Namespace }}
-          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite
     {{- end }}
+          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite
     {{- end }}
   - name: Assert Status Conditions
     description: |

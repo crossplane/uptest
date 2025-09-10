@@ -17,14 +17,12 @@ spec:
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
-    {{- end -}}
-    {{- if not $resource.Namespace }}
+    {{- end }}
     {{- if $resource.Root }}
     - script:
         content: |
           ${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"status":{"conditions":[]}}'
           ${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'
-    {{- end }}
     {{- end }}
     {{- end }}
   - name: Assert Updated Resource
@@ -34,8 +32,7 @@ spec:
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
-    {{- end -}}
-    {{- if not $resource.Namespace }}
+    {{- end }}
     {{- if $resource.Root }}
     try:
     - assert:
@@ -44,13 +41,15 @@ spec:
           kind: {{ $resource.Kind }}
           metadata:
             name: {{ $resource.Name }}
+            {{- if $resource.Namespace }}
+            namespace: {{ $resource.Namespace }}
+            {{- end }}
           status:
             {{- range $condition := $resource.Conditions }}
             ((conditions[?type == '{{ $condition }}'])[0]):
               status: "True"
             {{- end }}
     - script:
-        content: ${KUBECTL} get {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"
-    {{- end }}
+        content: ${KUBECTL} get {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"
     {{- end }}
     {{- end }}

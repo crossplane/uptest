@@ -21,10 +21,8 @@ spec:
           {{- range $resource := .Resources }}
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
-          {{- end -}}
-          {{- if not $resource.Namespace }}
-          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite
           {{- end }}
+          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite
           {{- end }}
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
@@ -36,6 +34,7 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
@@ -44,14 +43,15 @@ spec:
     {{- if not $resource.Namespace }}
           /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
     {{- end }}
+    {{- if $resource.Namespace }}
+          /tmp/patch-ns.sh {{ $resource.KindGroup }} {{ $resource.Name }} {{ $resource.Namespace }}
+    {{- end }}
     {{- end }}
           {{- range $resource := .Resources }}
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
-          {{- end -}}
-          {{- if not $resource.Namespace }}
-          ${KUBECTL} annotate {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite
           {{- end }}
+          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite
           {{- end }}
   - name: Assert Status Conditions and IDs
     description: |
@@ -62,21 +62,22 @@ spec:
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
-    {{- end -}}
-    {{- if not $resource.Namespace }}
+    {{- end }}
     - assert:
         resource:
           apiVersion: {{ $resource.APIVersion }}
           kind: {{ $resource.Kind }}
           metadata:
             name: {{ $resource.Name }}
+            {{- if $resource.Namespace }}
+            namespace: {{ $resource.Namespace }}
+            {{- end }}
           status:
             {{- range $condition := $resource.Conditions }}
             ((conditions[?type == '{{ $condition }}'])[0]):
               status: "True"
             {{- end }}
-    {{- end }}
-    {{- if not (or $resource.Namespace $resource.SkipImport) }}
+    {{- if not $resource.SkipImport }}
     - assert:
         timeout: 1m
         resource:
@@ -84,6 +85,9 @@ spec:
           kind: {{ $resource.Kind }}
           metadata:
             name: {{ $resource.Name }}
+            {{- if $resource.Namespace }}
+            namespace: {{ $resource.Namespace }}
+            {{- end }}
           ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
     {{- end }}
     {{- end }}

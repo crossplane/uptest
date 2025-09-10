@@ -71,3 +71,37 @@ go.cachedir:
 
 go.mod.cachedir:
 	@go env GOMODCACHE
+
+# ====================================================================================
+# E2E Testing
+
+CROSSPLANE_VERSION = 1.20.0
+CROSSPLANE_NAMESPACE = crossplane-system
+-include build/makelib/local.xpkg.mk
+
+# Run all e2e tests
+uptest-e2e: $(KIND) $(KUBECTL) $(CHAINSAW) $(CROSSPLANE_CLI) build
+	@echo "Running all e2e tests..."
+	@KIND=$(KIND) KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) PLATFORM=$(PLATFORM) ./tests/e2e/ci/test-runner.sh
+
+# Run e2e tests for provider-nop only
+uptest-e2e.nop: $(KIND) $(KUBECTL) $(CHAINSAW) $(CROSSPLANE_CLI) build
+	@echo "Running provider-nop e2e tests..."
+	@KIND=$(KIND) KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) PLATFORM=$(PLATFORM) PROVIDER=nop ./tests/e2e/ci/test-runner.sh
+
+# Run e2e tests for provider-kubernetes only
+uptest-e2e.kubernetes: $(KIND) $(KUBECTL) $(CHAINSAW) $(CROSSPLANE_CLI) build
+	@echo "Running provider-kubernetes e2e tests..."
+	@KIND=$(KIND) KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) PLATFORM=$(PLATFORM) PROVIDER=kubernetes ./tests/e2e/ci/test-runner.sh
+
+# Setup kind cluster for e2e testing
+uptest-e2e.setup:
+	@echo "Setting up kind cluster for e2e testing..."
+	@KIND=$(KIND) KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) PLATFORM=$(PLATFORM) ./tests/e2e/ci/kind-cluster.sh
+
+# Cleanup kind cluster after e2e testing
+uptest-e2e.cleanup:
+	@echo "Cleaning up kind cluster..."
+	@KIND=$(KIND) KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) PLATFORM=$(PLATFORM) kind delete cluster --name uptest-e2e || true
+
+.PHONY: e2e e2e.nop e2e.kubernetes e2e.setup e2e.cleanup

@@ -239,7 +239,7 @@ func (t *Tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 					log.Println("Skipping import step because the root resource has disable import annotation")
 					tc.SkipImport = true
 				}
-				if updateParameter == "" || obj.GetNamespace() != "" {
+				if updateParameter == "" {
 					log.Println("Skipping update step because the root resource does not have the update parameter")
 					tc.SkipUpdate = true
 				}

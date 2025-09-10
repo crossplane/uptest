@@ -1,0 +1,18 @@
+apiVersion: nop.crossplane.io/v1alpha1
+kind: ClusterNopResource
+metadata:
+  name: test-timeout-resource
+  annotations:
+    uptest.upbound.io/timeout: "30"
+spec:
+  forProvider:
+    conditionAfter:
+    - time: 5s
+      conditionType: "Ready"
+      conditionStatus: "True"
+    - time: 10s
+      conditionType: "Synced" 
+      conditionStatus: "True"
+  writeConnectionSecretsToRef:
+    name: test-timeout-resource-conn
+    namespace: crossplane-system
