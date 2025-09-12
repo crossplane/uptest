@@ -40,11 +40,13 @@ spec:
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end -}}
+    {{- if not $resource.SkipImport }}
     {{- if not $resource.Namespace }}
           /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
     {{- end }}
     {{- if $resource.Namespace }}
           /tmp/patch-ns.sh {{ $resource.KindGroup }} {{ $resource.Name }} {{ $resource.Namespace }}
+    {{- end }}
     {{- end }}
     {{- end }}
           {{- range $resource := .Resources }}
@@ -63,6 +65,7 @@ spec:
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end }}
+    {{- if not $resource.SkipImport }}
     - assert:
         resource:
           apiVersion: {{ $resource.APIVersion }}
@@ -77,6 +80,7 @@ spec:
             ((conditions[?type == '{{ $condition }}'])[0]):
               status: "True"
             {{- end }}
+    {{- end }}
     {{- if not $resource.SkipImport }}
     - assert:
         timeout: 1m
