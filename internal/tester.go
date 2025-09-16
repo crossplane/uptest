@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -94,6 +95,13 @@ func (t *Tester) ExecuteTests() error {
 }
 
 func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
+	if t.options.UseLibraryMode {
+		return executeSingleTestFileLibraryMode(t, tf, timeout, resources)
+	}
+	return executeSingleTestFileCLIMode(t, tf, timeout, resources)
+}
+
+func executeSingleTestFileLibraryMode(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
 	// Explicitly Set Controller Logger
 	// because of log.SetLogger(...) was never called;
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -160,7 +168,7 @@ func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resource
 		close(done)
 	}()
 
-	go logCollector(done, ticker, &mutex, resources)
+	go logCollectorLibraryMode(done, ticker, &mutex, resources)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -185,7 +193,48 @@ func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resource
 	return nil
 }
 
-func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+func executeSingleTestFileCLIMode(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
+	chainsawCommand := fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`,
+		filepath.Clean(filepath.Join(t.options.Directory, caseDirectory)),
+		filepath.Clean(tf))
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", "-c", chainsawCommand) // #nosec G204
+	stdout, _ := cmd.StdoutPipe()
+	if err := cmd.Start(); err != nil {
+		return errors.Wrapf(err, "cannot start chainsaw: %s", chainsawCommand)
+	}
+
+	// Start ticker for kubectl command every 30 seconds
+	ticker := time.NewTicker(t.options.LogCollectionInterval)
+	done := make(chan bool)
+	defer func() {
+		ticker.Stop()
+		close(done)
+	}()
+
+	var mutex sync.Mutex
+	go logCollectorCLIMode(done, ticker, &mutex, resources)
+
+	sc := bufio.NewScanner(stdout)
+	for sc.Scan() {
+		mutex.Lock()
+		log.Println(sc.Text())
+		mutex.Unlock()
+	}
+	if sc.Err() != nil {
+		return errors.Wrap(sc.Err(), "cannot scan output")
+	}
+	if err := cmd.Wait(); err != nil {
+		return errors.Wrapf(err, "cannot wait for chainsaw: %s", chainsawCommand)
+	}
+
+	return nil
+}
+
+func logCollectorLibraryMode(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
 	logger := logging.NewNopLogger()
 	for {
 		select {
@@ -208,6 +257,30 @@ func logCollector(done chan bool, ticker *time.Ticker, mutex sync.Locker, resour
 
 				if err := traceCmd.Run(kongCtx, logger); err != nil {
 					continue
+				}
+			}
+			mutex.Unlock()
+		}
+	}
+}
+
+func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			mutex.Lock()
+			for _, r := range resources {
+				// During the setup script is running, the crossplane command
+				// is failing because of the resource not found error.
+				// We do not want to show this error to the user because it
+				// is a noise and temporary one.
+				// The error output was redirected to a file.
+				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				output, err := traceCmd.CombinedOutput()
+				if err == nil {
+					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
 				}
 			}
 			mutex.Unlock()

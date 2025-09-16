@@ -62,6 +62,7 @@ type AutomatedTest struct {
 
 	RenderOnly            bool
 	LogCollectionInterval time.Duration
+	UseLibraryMode        bool
 }
 
 // Manifest represents a resource loaded from an example resource manifest file.

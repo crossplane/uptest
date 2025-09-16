@@ -99,6 +99,12 @@ func (b *Builder) SetLogCollectionInterval(logCollectionInterval time.Duration) 
 	return b
 }
 
+// SetUseLibraryMode sets whether the AutomatedTest should use library mode instead of CLI fork mode and returns the Builder.
+func (b *Builder) SetUseLibraryMode(useLibraryMode bool) *Builder {
+	b.test.UseLibraryMode = useLibraryMode
+	return b
+}
+
 // Build finalizes and returns the constructed AutomatedTest instance.
 func (b *Builder) Build() *AutomatedTest {
 	return &b.test
