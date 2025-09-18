@@ -22,14 +22,25 @@ usage: uptest e2e [<flags>] [<manifest-list>]
 Run e2e tests for manifests by applying them to a control plane and waiting until a given condition is met.
 
 Flags:
-  --help                        Show context-sensitive help (also try --help-long and --help-man).
-  --data-source=""              File path of data source that will be used for injection some values.
-  --setup-script=""             Script that will be executed before running tests.
-  --teardown-script=""          Script that will be executed after running tests.
-  --default-timeout=1200        Default timeout in seconds for the test. Timeout could be overridden per resource using
-                                "uptest.upbound.io/timeout" annotation.
-  --default-conditions="Ready"  Comma seperated list of default conditions to wait for a successful test. Conditions could be
-                                overridden per resource using "uptest.upbound.io/conditions" annotation.
+  --help                             Show context-sensitive help (also try --help-long and --help-man).
+  --data-source=""                   File path of data source that will be used for injection some values.
+  --setup-script=""                  Script that will be executed before running tests.
+  --teardown-script=""               Script that will be executed after running tests.
+  --default-timeout=1200s            Default timeout in seconds for the test. Timeout could be overridden per resource using
+                                     "uptest.upbound.io/timeout" annotation.
+  --default-conditions="Ready"       Comma separated list of default conditions to wait for a successful test. Conditions could be
+                                     overridden per resource using "uptest.upbound.io/conditions" annotation.
+  --skip-delete                      Skip the delete step of the test.
+  --test-directory="/tmp/uptest-e2e" Directory where chainsaw test case will be generated and executed.
+  --only-clean-uptest-resources      While deletion step, only clean resources that were created by uptest
+  --render-only                      Only render test files. Do not run the tests.
+  --log-collect-interval=30s         Specifies the interval duration for collecting logs. The duration should be provided in a
+                                     format understood by the tool, such as seconds (s), minutes (m), or hours (h). For example,
+                                     '30s' for 30 seconds, '5m' for 5 minutes, or '1h' for one hour.
+  --skip-update                      Skip the update step of the test.
+  --skip-import                      Skip the import step of the test.
+  --use-library-mode                 Use library mode instead of CLI fork mode. When enabled, chainsaw and crossplane are used as Go
+                                     libraries instead of external CLI commands.
 
 Args:
   [<manifest-list>]  List of manifests. Value of this option will be used to trigger/configure the tests.The possible usage:
@@ -45,6 +56,10 @@ Example run:
 ```shell
 uptest e2e examples/user.yaml,examples/bucket.yaml --setup-script="test/hooks/setup.sh"
 ```
+
+## Execution Modes
+
+Uptest supports two execution modes: CLI Fork Mode (default) and Library Mode. For detailed information about these modes, their differences, and usage examples, see [Execution Modes Documentation](docs/execution-modes.md).
 
 ### Injecting Dynamic Values (and Datasource)
 

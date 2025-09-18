@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 
 	"github.com/crossplane/uptest/internal"
 	"github.com/crossplane/uptest/internal/config"
