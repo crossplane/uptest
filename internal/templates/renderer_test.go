@@ -162,14 +162,22 @@ spec:
     - script:
         content: |
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
     - sleep:
         duration: 10s
     - script:
         content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
@@ -325,14 +333,22 @@ spec:
     - script:
         content: |
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
     - sleep:
         duration: 10s
     - script:
         content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
@@ -533,14 +549,22 @@ spec:
         content: |
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
     - sleep:
         duration: 10s
     - script:
         content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
@@ -738,14 +762,22 @@ spec:
     - script:
         content: |
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
     - sleep:
         duration: 10s
     - script:
         content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
@@ -1046,14 +1078,22 @@ spec:
         content: |
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
     - sleep:
         duration: 10s
     - script:
         content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
