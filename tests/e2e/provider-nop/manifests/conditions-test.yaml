@@ -1,0 +1,22 @@
+apiVersion: nop.crossplane.io/v1alpha1
+kind: ClusterNopResource
+metadata:
+  name: test-conditions-resource
+  annotations:
+    uptest.upbound.io/timeout: "90"
+    uptest.upbound.io/conditions: "Ready,Synced,UpToDate"
+spec:
+  forProvider:
+    conditionAfter:
+    - time: 10s
+      conditionType: "Ready"
+      conditionStatus: "True"
+    - time: 20s
+      conditionType: "Synced" 
+      conditionStatus: "True"
+    - time: 30s
+      conditionType: "UpToDate"
+      conditionStatus: "True"
+  writeConnectionSecretsToRef:
+    name: test-conditions-resource-conn
+    namespace: crossplane-system

@@ -1,0 +1,37 @@
+apiVersion: nop.crossplane.io/v1alpha1
+kind: ClusterNopResource
+metadata:
+  name: test-multi-resource-1
+  annotations:
+    uptest.upbound.io/timeout: "60"
+spec:
+  forProvider:
+    conditionAfter:
+    - time: 5s
+      conditionType: "Ready"
+      conditionStatus: "True"
+    - time: 10s
+      conditionType: "Synced" 
+      conditionStatus: "True"
+  writeConnectionSecretsToRef:
+    name: test-multi-resource-1-conn
+    namespace: crossplane-system
+---
+apiVersion: nop.crossplane.io/v1alpha1
+kind: ClusterNopResource
+metadata:
+  name: test-multi-resource-2
+  annotations:
+    uptest.upbound.io/timeout: "60"
+spec:
+  forProvider:
+    conditionAfter:
+    - time: 8s
+      conditionType: "Ready"
+      conditionStatus: "True"
+    - time: 15s
+      conditionType: "Synced" 
+      conditionStatus: "True"
+  writeConnectionSecretsToRef:
+    name: test-multi-resource-2-conn
+    namespace: crossplane-system

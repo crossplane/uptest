@@ -1,0 +1,21 @@
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: test-simple-configmap-ns
+  namespace: crossplane-system
+  annotations:
+    uptest.upbound.io/timeout: "60"
+spec:
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: test-configmap-ns
+        namespace: crossplane-system
+      data:
+        key1: "value1"
+        key2: "value2"
+  providerConfigRef:
+    name: cluster
+    kind: ClusterProviderConfig

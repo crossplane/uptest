@@ -1,0 +1,37 @@
+apiVersion: kubernetes.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: test-multi-configmap-1
+  annotations:
+    uptest.upbound.io/timeout: "60"
+spec:
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: test-multi-configmap-1
+        namespace: default
+      data:
+        config1: "value1"
+  providerConfigRef:
+    name: default
+---
+apiVersion: kubernetes.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: test-multi-configmap-2
+  annotations:
+    uptest.upbound.io/timeout: "60"
+spec:
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: test-multi-configmap-2
+        namespace: default
+      data:
+        config2: "value2"
+  providerConfigRef:
+    name: default

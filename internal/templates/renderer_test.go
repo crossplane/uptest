@@ -103,7 +103,7 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -161,7 +161,7 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
@@ -172,9 +172,10 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -265,7 +266,7 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -323,7 +324,7 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
@@ -334,9 +335,10 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -418,6 +420,7 @@ spec:
 						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
 						PreDeleteScriptPath:  "/tmp/claim/pre-delete.sh",
 						Conditions:           []string{"Ready", "Synced"},
+						SkipImport:           true,
 					},
 					{
 						YAML:      secretManifest,
@@ -453,7 +456,8 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -527,7 +531,8 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
@@ -538,9 +543,11 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -672,7 +679,7 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -730,7 +737,7 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
@@ -741,9 +748,10 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -778,6 +786,7 @@ spec:
 					SetupScriptPath:    "/tmp/setup.sh",
 					TeardownScriptPath: "/tmp/teardown.sh",
 					TestDirectory:      "/tmp/test-input.yaml",
+					SkipImport:         true,
 				},
 				resources: []config.Resource{
 					{
@@ -801,6 +810,7 @@ spec:
 						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
 						PreDeleteScriptPath:  "/tmp/claim/pre-delete.sh",
 						Conditions:           []string{"Ready", "Synced"},
+						SkipImport:           true,
 					},
 					{
 						YAML:      secretManifest,
@@ -836,7 +846,8 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -889,56 +900,6 @@ spec:
     description: |
       Assert update operation. Firstly check the status conditions. Then assert
       the updated field in status.atProvider.
-`,
-					"02-import.yaml": `# This file belongs to the resource import step.
-apiVersion: chainsaw.kyverno.io/v1alpha1
-kind: Test
-metadata:
-  name: import
-spec:
-  timeouts:
-    apply: 10m0s
-    assert: 10m0s
-    exec: 10m0s
-  steps:
-  - name: Remove State
-    description: |
-      Removes the resource statuses from MRs and controllers. For controllers
-      the scale down&up was applied. For MRs status conditions are patched.
-      Also, for the assertion step, the ID before import was stored in the
-      uptest-old-id annotation.
-    try:
-    - script:
-        content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
-    - sleep:
-        duration: 10s
-    - script:
-        content: |
-          ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=1 --timeout 10s
-          ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          /tmp/check_endpoints.sh
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
-  - name: Assert Status Conditions and IDs
-    description: |
-      Assert imported resources. Firstly check the status conditions. Then
-      compare the stored ID and the new populated ID. For successful test,
-      the ID must be the same.
-    try:
-    - assert:
-        resource:
-          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
-          kind: Bucket
-          metadata:
-            name: example-bucket
-          status:
-            ((conditions[?type == 'Test'])[0]):
-              status: "True"
 `,
 				},
 			},
@@ -972,6 +933,7 @@ spec:
 						PostAssertScriptPath: "/tmp/claim/post-assert.sh",
 						PreDeleteScriptPath:  "/tmp/claim/pre-delete.sh",
 						Conditions:           []string{"Ready", "Synced"},
+						SkipImport:           true,
 					},
 					{
 						YAML:      secretManifest,
@@ -1007,7 +969,8 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1081,7 +1044,8 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
           ${KUBECTL} scale deployment crossplane -n ${CROSSPLANE_NAMESPACE} --replicas=0 --timeout 10s
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=0
     - sleep:
@@ -1092,9 +1056,11 @@ spec:
           ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} get deploy --no-headers -o custom-columns=":metadata.name" | grep "provider-" | xargs ${KUBECTL} -n ${CROSSPLANE_NAMESPACE} scale deploy --replicas=1
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -1172,6 +1138,7 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1256,7 +1223,8 @@ spec:
     - script:
         content: |
           echo "Runnning annotation script"
-          ${KUBECTL} annotate xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
+          ${KUBECTL} annotate  xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
