@@ -11,7 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/crossplane/uptest/internal/config"
+	"github.com/crossplane/uptest/v2/internal/config"
 )
 
 const (
