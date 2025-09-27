@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/crossplane/uptest/pkg"
+	"github.com/crossplane/uptest/v2/pkg"
 )
 
 var (

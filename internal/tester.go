@@ -37,8 +37,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane/v2/cmd/crank/beta/trace"
 
-	"github.com/crossplane/uptest/internal/config"
-	"github.com/crossplane/uptest/internal/templates"
+	"github.com/crossplane/uptest/v2/internal/config"
+	"github.com/crossplane/uptest/v2/internal/templates"
 )
 
 var testFiles = []string{

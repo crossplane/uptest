@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
-module github.com/crossplane/uptest
+module github.com/crossplane/uptest/v2
 
 go 1.24.6
 
