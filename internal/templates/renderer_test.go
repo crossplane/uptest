@@ -98,6 +98,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -182,6 +190,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
@@ -269,6 +278,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -353,6 +370,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
@@ -467,6 +485,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -569,6 +595,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
           ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
@@ -698,6 +725,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -782,6 +817,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
@@ -873,6 +909,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -996,6 +1040,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -1098,6 +1150,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
           ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
           ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
@@ -1173,6 +1226,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
@@ -1258,6 +1319,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: /tmp/test-input.yaml
     - script:
