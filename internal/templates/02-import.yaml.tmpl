@@ -44,6 +44,7 @@ spec:
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
           /tmp/check_endpoints.sh
+          sleep 10
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}

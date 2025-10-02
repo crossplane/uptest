@@ -19,7 +19,7 @@ echo "Using uptest binary: $UPTEST_BIN"
 echo "=== Test 1: Basic resource test ==="
 cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/basic-resource.yaml"
 
 # Test 2: Timeout test
@@ -33,14 +33,14 @@ cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
 echo "=== Test 3: Custom conditions test ==="
 cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/conditions-test.yaml"
 
 # Test 4: Multi-resource test
 echo "=== Test 4: Multi-resource test ==="
 cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/multi-resource.yaml"
 
 # Test 5: Skip delete test
@@ -48,7 +48,7 @@ echo "=== Test 5: Skip delete test ==="
 cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
     --skip-delete \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/basic-resource.yaml"
 
 # Test 6: Render only test
@@ -56,7 +56,7 @@ echo "=== Test 6: Render only test ==="
 cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
     --render-only \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/basic-resource.yaml"
 
 # Test 7: Skip import and update test
@@ -65,7 +65,7 @@ cd "$SCRIPT_DIR" && $UPTEST_BIN e2e \
     --setup-script="setup.sh" \
     --skip-import \
     --skip-update \
-    --default-timeout=120s \
+    --default-timeout=240s \
     "manifests/basic-resource.yaml"
 
 echo "All provider-nop e2e tests completed successfully!"

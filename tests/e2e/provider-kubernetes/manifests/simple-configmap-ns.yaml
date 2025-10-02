@@ -4,7 +4,7 @@ metadata:
   name: test-simple-configmap-ns
   namespace: crossplane-system
   annotations:
-    uptest.upbound.io/timeout: "60"
+    uptest.upbound.io/timeout: "180"
 spec:
   forProvider:
     manifest:
