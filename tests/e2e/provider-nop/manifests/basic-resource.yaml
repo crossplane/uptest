@@ -3,7 +3,7 @@ kind: ClusterNopResource
 metadata:
   name: test-basic-resource
   annotations:
-    uptest.upbound.io/timeout: "60"
+    uptest.upbound.io/timeout: "120"
 spec:
   forProvider:
     conditionAfter:

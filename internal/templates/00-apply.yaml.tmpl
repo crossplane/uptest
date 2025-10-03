@@ -19,6 +19,14 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
     - apply:
         file: {{ .TestCase.TestDirectory }}
     - script:

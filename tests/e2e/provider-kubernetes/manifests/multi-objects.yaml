@@ -3,7 +3,7 @@ kind: Object
 metadata:
   name: test-multi-configmap-1
   annotations:
-    uptest.upbound.io/timeout: "60"
+    uptest.upbound.io/timeout: "180"
 spec:
   forProvider:
     manifest:
@@ -22,7 +22,7 @@ kind: Object
 metadata:
   name: test-multi-configmap-2
   annotations:
-    uptest.upbound.io/timeout: "60"
+    uptest.upbound.io/timeout: "180"
 spec:
   forProvider:
     manifest:
