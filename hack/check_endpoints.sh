@@ -1,14 +1,14 @@
 #!/bin/bash
 
 function check_endpoints {
-	endpoints=( $("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpoints --no-headers | grep 'provider-' | awk '{print $1}') )
-	for endpoint in ${endpoints[@]}; do
-		port=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpoints "$endpoint" -o jsonpath='{.subsets[*].ports[0].port}')
-		if [[ -z "${port}" ]]; then
-			echo "$endpoint - No served ports"
+	slices=($("${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" get endpointslices --no-headers | grep 'provider-' | awk '{print $1}'))
+	for s in "${slices[@]}"; do
+		addresses=$(${KUBECTL} -n "${CROSSPLANE_NAMESPACE}" get endpointslice "${s}" -o go-template='{{ range .endpoints }} {{- if and (eq .conditions.serving true) (eq .conditions.terminating false) }} {{- .addresses }}{{ "\n" }}{{- end }} {{- end }}')
+		if [[ -z "${addresses}" ]]; then
+			echo "${s} - No serving addresses in endpointslice"
 			return 1
 		else
-			echo "$endpoint - Ports present"
+			echo "${s} - Serving addresses ${addresses} found in endpointslice"
 		fi
 	done
 }
