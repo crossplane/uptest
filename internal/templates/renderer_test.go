@@ -110,8 +110,31 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -169,7 +192,29 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -192,7 +237,30 @@ spec:
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -231,7 +299,30 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
@@ -290,8 +381,31 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -349,7 +463,29 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -372,7 +508,30 @@ spec:
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -411,7 +570,30 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
@@ -497,9 +679,32 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -573,8 +778,30 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite"
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -597,8 +824,31 @@ spec:
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite"
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -637,10 +887,33 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
           /tmp/bucket/post-delete.sh
           /tmp/claim/pre-delete.sh
-          ${KUBECTL} delete cluster.gcp.platformref.upbound.io/test-cluster-claim --wait=false --namespace upbound-system --ignore-not-found
+          retry_kubectl "${KUBECTL} delete cluster.gcp.platformref.upbound.io/test-cluster-claim --wait=false --namespace upbound-system --ignore-not-found"
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
@@ -737,8 +1010,31 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -796,7 +1092,29 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -819,7 +1137,30 @@ spec:
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -921,9 +1262,32 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1052,9 +1416,32 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1128,8 +1515,30 @@ spec:
     try:
     - script:
         content: |
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite"
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -1152,8 +1561,31 @@ spec:
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
-          ${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite"
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -1238,8 +1670,31 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1331,9 +1786,32 @@ spec:
         file: /tmp/test-input.yaml
     - script:
         content: |
-          echo "Runnning annotation script"
-          ${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite
-          ${KUBECTL} annotate  xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
+          retry_annotate "${KUBECTL} annotate  xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.

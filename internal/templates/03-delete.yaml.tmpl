@@ -12,6 +12,29 @@ spec:
     try:
     - script:
         content: |
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
         {{- range $resource := .Resources }}
         {{- if eq $resource.KindGroup "secret." -}}
           {{continue}}
@@ -20,9 +43,9 @@ spec:
           {{ $resource.PreDeleteScriptPath }}
         {{- end }}
         {{- if $resource.Namespace }}
-          ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --namespace {{ $resource.Namespace }} --ignore-not-found
+          retry_kubectl "${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --namespace {{ $resource.Namespace }} --ignore-not-found"
         {{- else }}
-          ${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --ignore-not-found
+          retry_kubectl "${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --ignore-not-found"
         {{- end }}
         {{- if $resource.PostDeleteScriptPath }}
           {{ $resource.PostDeleteScriptPath }}
