@@ -21,8 +21,31 @@ spec:
     {{- if $resource.Root }}
     - script:
         content: |
-          ${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"status":{"conditions":[]}}'
-          ${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{\"status\":{\"conditions\":[]}}'"
+          retry_kubectl "${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{\"spec\":{\"forProvider\":{{ $resource.UpdateParameter }}}}'"
     {{- end }}
     {{- end }}
   - name: Assert Updated Resource

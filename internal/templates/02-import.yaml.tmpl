@@ -18,11 +18,33 @@ spec:
     try:
     - script:
         content: |
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
           {{- range $resource := .Resources }}
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
           {{- end }}
-          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite
+          retry_kubectl "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite"
           {{- end }}
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
@@ -58,11 +80,34 @@ spec:
     {{- end }}
     {{- end }}
     {{- end }}
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
           {{- range $resource := .Resources }}
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
           {{- end }}
-          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite
+          retry_kubectl "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite"
           {{- end }}
   - name: Assert Status Conditions and IDs
     description: |

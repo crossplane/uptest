@@ -31,12 +31,35 @@ spec:
         file: {{ .TestCase.TestDirectory }}
     - script:
         content: |
-          echo "Runnning annotation script"
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
     {{- range $i, $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end }}
-          ${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite
+          retry_annotate "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite"
     {{- end }}
   - name: Assert Status Conditions
     description: |
