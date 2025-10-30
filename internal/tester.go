@@ -255,6 +255,10 @@ func logCollectorLibraryMode(done chan bool, ticker *time.Ticker, mutex sync.Loc
 					Output:   "wide",
 				}
 
+				if r.Namespace != "" {
+					traceCmd.Namespace = r.Namespace
+				}
+
 				if err := traceCmd.Run(kongCtx, logger); err != nil {
 					continue
 				}
@@ -277,7 +281,11 @@ func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker,
 				// We do not want to show this error to the user because it
 				// is a noise and temporary one.
 				// The error output was redirected to a file.
-				traceCmd := exec.Command("bash", "-c", fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name)) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				traceCmdArgs := fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name)
+				if r.Namespace != "" {
+					traceCmdArgs = fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -n %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name, r.Namespace)
+				}
+				traceCmd := exec.Command("bash", "-c", traceCmdArgs) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
 				output, err := traceCmd.CombinedOutput()
 				if err == nil {
 					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
