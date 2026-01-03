@@ -6,6 +6,11 @@ package templates
 
 import _ "embed"
 
+// setupFileTemplate is the template for the setup file.
+//
+//go:embed 0-setup.yaml.tmpl
+var setupFileTemplate string
+
 // inputFileTemplate is the template for the input file.
 //
 //go:embed 00-apply.yaml.tmpl
