@@ -64,7 +64,7 @@ type Tester struct {
 }
 
 // ExecuteTests execute tests via chainsaw.
-func (t *Tester) ExecuteTests() error {
+func (t *Tester) ExecuteTests(ctx context.Context) error {
 	if err := writeTestFile(t.manifests, t.options.Directory); err != nil {
 		return errors.Wrap(err, "cannot write test manifest files")
 	}
@@ -87,21 +87,21 @@ func (t *Tester) ExecuteTests() error {
 			log.Println("Skipping test " + tf)
 			continue
 		}
-		if err := executeSingleTestFile(t, tf, timeout-time.Since(startTime), resources); err != nil {
+		if err := executeSingleTestFile(ctx, t, tf, timeout-time.Since(startTime), resources); err != nil {
 			return errors.Wrap(err, "cannot execute test "+tf)
 		}
 	}
 	return nil
 }
 
-func executeSingleTestFile(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
+func executeSingleTestFile(ctx context.Context, t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
 	if t.options.UseLibraryMode {
-		return executeSingleTestFileLibraryMode(t, tf, timeout, resources)
+		return executeSingleTestFileLibraryMode(ctx, t, tf, timeout, resources)
 	}
-	return executeSingleTestFileCLIMode(t, tf, timeout, resources)
+	return executeSingleTestFileCLIMode(ctx, t, tf, timeout, resources)
 }
 
-func executeSingleTestFileLibraryMode(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
+func executeSingleTestFileLibraryMode(ctx context.Context, t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
 	// Explicitly Set Controller Logger
 	// because of log.SetLogger(...) was never called;
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -170,7 +170,7 @@ func executeSingleTestFileLibraryMode(t *Tester, tf string, timeout time.Duratio
 
 	go logCollectorLibraryMode(done, ticker, &mutex, resources)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if err := runnerflags.SetupFlags(configuration.Spec); err != nil {
@@ -193,12 +193,12 @@ func executeSingleTestFileLibraryMode(t *Tester, tf string, timeout time.Duratio
 	return nil
 }
 
-func executeSingleTestFileCLIMode(t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
+func executeSingleTestFileCLIMode(ctx context.Context, t *Tester, tf string, timeout time.Duration, resources []config.Resource) error {
 	chainsawCommand := fmt.Sprintf(`"${CHAINSAW}" test --test-dir %s --test-file %s --skip-delete --parallel 1 2>&1`,
 		filepath.Clean(filepath.Join(t.options.Directory, caseDirectory)),
 		filepath.Clean(tf))
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", chainsawCommand) // #nosec G204
