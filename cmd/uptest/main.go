@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,5 +108,6 @@ func e2eTests() {
 		SetUseLibraryMode(*useLibraryMode).
 		Build()
 
-	kingpin.FatalIfError(pkg.RunTest(automatedTest), "cannot run e2e tests successfully")
+	ctx := context.Background()
+	kingpin.FatalIfError(pkg.RunTestContext(ctx, automatedTest), "cannot run e2e tests successfully")
 }

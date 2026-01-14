@@ -6,6 +6,7 @@
 package pkg
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -15,8 +16,16 @@ import (
 	"github.com/crossplane/uptest/v2/internal/config"
 )
 
-// RunTest runs the specified automated test
+// RunTest runs the specified automated test.
+//
+// Deprecated: Use RunTestContext.
 func RunTest(o *config.AutomatedTest) error {
+	return RunTestContext(context.Background(), o)
+}
+
+// RunTestContext runs the specified automated test, respecting context
+// cancellation.
+func RunTestContext(ctx context.Context, o *config.AutomatedTest) error {
 	if !o.RenderOnly {
 		defer func() {
 			if err := os.RemoveAll(o.Directory); err != nil {
@@ -32,7 +41,7 @@ func RunTest(o *config.AutomatedTest) error {
 	}
 
 	// Prepare assert environment and run tests
-	if err := internal.NewTester(manifests, o).ExecuteTests(); err != nil {
+	if err := internal.NewTester(manifests, o).ExecuteTests(ctx); err != nil {
 		return errors.Wrap(err, "cannot execute tests")
 	}
 
