@@ -19,6 +19,7 @@ spec:
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
+    {{- if not .TestCase.SkipWebhookCheck }}
     - script:
         content: |
           echo "Checking webhook health before proceeding..."
@@ -27,6 +28,7 @@ spec:
     - sleep:
         # Wait for conversion webhook endpoints to become fully operational after health check
         duration: 10s
+    {{- end }}
     - apply:
         file: {{ .TestCase.TestDirectory }}
     - script:

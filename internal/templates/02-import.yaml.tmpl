@@ -62,11 +62,13 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          {{- if not .TestCase.SkipWebhookCheck }}
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
+          {{- end }}
     {{- range $resource := .Resources }}
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
