@@ -231,9 +231,9 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
@@ -502,9 +502,9 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
@@ -818,9 +818,9 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
@@ -1131,9 +1131,9 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
@@ -1555,9 +1555,9 @@ spec:
           else
             echo "No provider DeploymentRuntimeConfigs found to scale up"
           fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
           curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
           /tmp/check_endpoints.sh
           sleep 10
           /tmp/patch.sh s3.aws.upbound.io example-bucket
@@ -1845,6 +1845,322 @@ spec:
               status: "True"
     - command:
         entrypoint: /tmp/claim/post-assert.sh
+`,
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := Render(tc.args.tc, tc.args.resources, true)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("Render(...): -want error, +got error:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.out, got); diff != "" {
+				t.Errorf("Render(...): -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRenderWithSkipWebhookCheck(t *testing.T) {
+	type args struct {
+		tc        *config.TestCase
+		resources []config.Resource
+	}
+	type want struct {
+		out map[string]string
+		err error
+	}
+	tests := map[string]struct {
+		args args
+		want want
+	}{
+		"SkipWebhookCheckApplyOnly": {
+			args: args{
+				tc: &config.TestCase{
+					SetupScriptPath:  "/tmp/setup.sh",
+					Timeout:          10 * time.Minute,
+					TestDirectory:    "/tmp/test-input.yaml",
+					SkipWebhookCheck: true,
+					SkipUpdate:       true,
+					SkipImport:       true,
+				},
+				resources: []config.Resource{
+					{
+						Name:       "example-bucket",
+						APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:       "Bucket",
+						KindGroup:  "s3.aws.upbound.io",
+						YAML:       bucketManifest,
+						Conditions: []string{"Test"},
+					},
+				},
+			},
+			want: want{
+				out: map[string]string{
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+`,
+				},
+			},
+		},
+		"SkipWebhookCheckWithImport": {
+			args: args{
+				tc: &config.TestCase{
+					SetupScriptPath:  "/tmp/setup.sh",
+					Timeout:          10 * time.Minute,
+					TestDirectory:    "/tmp/test-input.yaml",
+					SkipWebhookCheck: true,
+					SkipUpdate:       true,
+				},
+				resources: []config.Resource{
+					{
+						Name:       "example-bucket",
+						APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:       "Bucket",
+						KindGroup:  "s3.aws.upbound.io",
+						YAML:       bucketManifest,
+						Conditions: []string{"Test"},
+					},
+				},
+			},
+			want: want{
+				out: map[string]string{
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+`,
+					"02-import.yaml": `# This file belongs to the resource import step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: import
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Remove State
+    description: |
+      Removes the resource statuses from MRs and controllers. For controllers
+      the scale down&up was applied. For MRs status conditions are patched.
+      Also, for the assertion step, the ID before import was stored in the
+      uptest-old-id annotation.
+    try:
+    - script:
+        content: |
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale down"
+          fi
+    - sleep:
+        duration: 10s
+    - script:
+        content: |
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
+          /tmp/patch.sh s3.aws.upbound.io example-bucket
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+  - name: Assert Status Conditions and IDs
+    description: |
+      Assert imported resources. Firstly check the status conditions. Then
+      compare the stored ID and the new populated ID. For successful test,
+      the ID must be the same.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+    - assert:
+        timeout: 1m
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          ("status.atProvider.id" == "metadata.annotations.uptest-old-id"): true
 `,
 				},
 			},

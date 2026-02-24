@@ -409,12 +409,16 @@ func (t *Tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 		tc.SkipUpdate = true
 	}
 	if t.options.SkipUpdate {
-		log.Println("Skipping update step because the skip-delete option is set to true")
+		log.Println("Skipping update step because the skip-update option is set to true")
 		tc.SkipUpdate = true
 	}
 	if t.options.SkipImport {
 		log.Println("Skipping import step because the skip-import option is set to true")
 		tc.SkipImport = true
+	}
+	if t.options.SkipWebhookCheck {
+		log.Println("Skipping webhook check because the skip-webhook-check option is set to true")
+		tc.SkipWebhookCheck = true
 	}
 
 	return tc, examples, nil

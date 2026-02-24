@@ -81,6 +81,12 @@ func (b *Builder) SetSkipImport(skipImport bool) *Builder {
 	return b
 }
 
+// SetSkipWebhookCheck sets whether the AutomatedTest should skip the webhook endpoint health check and returns the Builder.
+func (b *Builder) SetSkipWebhookCheck(skipWebhookCheck bool) *Builder {
+	b.test.SkipWebhookCheck = skipWebhookCheck
+	return b
+}
+
 // SetOnlyCleanUptestResources sets whether the AutomatedTest should clean up only test-specific resources and returns the Builder.
 func (b *Builder) SetOnlyCleanUptestResources(onlyCleanUptestResources bool) *Builder {
 	b.test.OnlyCleanUptestResources = onlyCleanUptestResources

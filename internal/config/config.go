@@ -54,9 +54,10 @@ type AutomatedTest struct {
 	DefaultTimeout    time.Duration
 	DefaultConditions []string
 
-	SkipDelete bool
-	SkipUpdate bool
-	SkipImport bool
+	SkipDelete       bool
+	SkipUpdate       bool
+	SkipImport       bool
+	SkipWebhookCheck bool
 
 	OnlyCleanUptestResources bool
 
@@ -79,6 +80,7 @@ type TestCase struct {
 	TeardownScriptPath string
 	SkipUpdate         bool
 	SkipImport         bool
+	SkipWebhookCheck   bool
 
 	OnlyCleanUptestResources bool
 
