@@ -1,0 +1,16 @@
+# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: {{ .TestCase.Timeout }}
+  steps:
+  {{- if .TestCase.SetupScriptPath }}
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: {{ .TestCase.SetupScriptPath }}
+  {{- end }}

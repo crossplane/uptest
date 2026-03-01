@@ -16,6 +16,7 @@ import (
 )
 
 var fileTemplates = map[string]string{
+	"0-setup.yaml":   setupFileTemplate,
 	"00-apply.yaml":  inputFileTemplate,
 	"01-update.yaml": updateFileTemplate,
 	"02-import.yaml": importFileTemplate,
@@ -24,6 +25,8 @@ var fileTemplates = map[string]string{
 
 // Render renders the specified list of resources as a test case
 // with the specified configuration.
+//
+// nolint:gocyclo
 func Render(tc *config.TestCase, resources []config.Resource, skipDelete bool) (map[string]string, error) {
 	data := struct {
 		Resources []config.Resource
@@ -35,6 +38,11 @@ func Render(tc *config.TestCase, resources []config.Resource, skipDelete bool) (
 
 	res := make(map[string]string, len(fileTemplates))
 	for name, tmpl := range fileTemplates {
+		// Skip templates with names starting with "0-" if no setup script is set
+		if tc.SetupScriptPath == "" && strings.HasPrefix(name, "0-") {
+			continue
+		}
+
 		// Skip templates with names starting with "01-" if skipUpdate is true
 		if tc.SkipUpdate && strings.HasPrefix(name, "01-") {
 			continue
