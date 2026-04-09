@@ -17,15 +17,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -44,7 +73,7 @@ spec:
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
           {{- end }}
-          retry_kubectl "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} crossplane.io/paused=true --overwrite"
+          retry_kubectl "{{ $resource.Namespace }}" "annotate" "{{ $resource.KindGroup }}/{{ $resource.Name }}" crossplane.io/paused=true --overwrite
           {{- end }}
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
@@ -55,42 +84,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          {{- if not .TestCase.SkipWebhookCheck }}
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          {{- end }}
-    {{- range $resource := .Resources }}
-    {{- if eq $resource.KindGroup "secret." -}}
-      {{continue}}
-    {{- end -}}
-    {{- if not $resource.SkipImport }}
-    {{- if not $resource.Namespace }}
-          /tmp/patch.sh {{ $resource.KindGroup }} {{ $resource.Name }}
-    {{- end }}
-    {{- if $resource.Namespace }}
-          /tmp/patch-ns.sh {{ $resource.KindGroup }} {{ $resource.Name }} {{ $resource.Namespace }}
-    {{- end }}
-    {{- end }}
-    {{- end }}
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -102,14 +167,63 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          {{- if not .TestCase.SkipWebhookCheck }}
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          {{- end }}
+    {{- range $resource := .Resources }}
+    {{- if eq $resource.KindGroup "secret." -}}
+      {{continue}}
+    {{- end -}}
+    {{- if not $resource.SkipImport }}
+          retry_patch_resource_for_import "{{ $resource.Namespace }}" "{{ $resource.KindGroup }}/{{ $resource.Name }}"
+    {{- end }}
+    {{- end }}
           {{- range $resource := .Resources }}
           {{- if eq $resource.KindGroup "secret." -}}
             {{continue}}
           {{- end }}
-          retry_kubectl "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} --all crossplane.io/paused=false --overwrite"
+          retry_kubectl "{{ $resource.Namespace }}" "annotate" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --all crossplane.io/paused=false --overwrite
           {{- end }}
   - name: Assert Status Conditions and IDs
     description: |

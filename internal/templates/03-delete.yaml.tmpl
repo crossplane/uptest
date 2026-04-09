@@ -11,16 +11,45 @@ spec:
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -42,11 +71,7 @@ spec:
         {{- if $resource.PreDeleteScriptPath }}
           {{ $resource.PreDeleteScriptPath }}
         {{- end }}
-        {{- if $resource.Namespace }}
-          retry_kubectl "${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --namespace {{ $resource.Namespace }} --ignore-not-found"
-        {{- else }}
-          retry_kubectl "${KUBECTL} delete {{ $resource.KindGroup }}/{{ $resource.Name }} --wait=false --ignore-not-found"
-        {{- end }}
+          retry_kubectl "{{ $resource.Namespace }}" "delete" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --wait=false --ignore-not-found
         {{- if $resource.PostDeleteScriptPath }}
           {{ $resource.PostDeleteScriptPath }}
         {{- end }}
@@ -59,8 +84,34 @@ spec:
       {{continue}}
     {{- end }}
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          ${KUBECTL} wait {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }}--for=delete {{ $resource.KindGroup }}/{{ $resource.Name }} --timeout {{ $.TestCase.Timeout }}
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "{{ $resource.Namespace }}" "wait" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --for=delete --timeout {{ $.TestCase.Timeout }}
     {{- end }}
     {{- if not .TestCase.OnlyCleanUptestResources }}
     - script:

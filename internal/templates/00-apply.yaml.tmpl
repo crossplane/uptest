@@ -32,17 +32,42 @@ spec:
     - apply:
         file: {{ .TestCase.TestDirectory }}
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -61,7 +86,7 @@ spec:
     {{- if eq $resource.KindGroup "secret." -}}
       {{continue}}
     {{- end }}
-          retry_annotate "${KUBECTL} annotate {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} upjet.upbound.io/test=true --overwrite"
+          retry_annotate "{{ $resource.Namespace }}" "{{ $resource.KindGroup }}/{{ $resource.Name }}"
     {{- end }}
   - name: Assert Status Conditions
     description: |
