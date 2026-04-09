@@ -495,7 +495,22 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
@@ -965,7 +980,22 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
@@ -1481,10 +1511,26 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
           /tmp/bucket/post-delete.sh
           /tmp/claim/pre-delete.sh
-          retry_kubectl "upbound-system" "delete" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --wait=false --ignore-not-found
+          resolved_namespace=$(resolve_delete_namespace "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim")
+          retry_kubectl "$resolved_namespace" "delete" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:

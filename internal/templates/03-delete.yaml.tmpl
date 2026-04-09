@@ -64,6 +64,20 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
         {{- range $resource := .Resources }}
         {{- if eq $resource.KindGroup "secret." -}}
           {{continue}}
@@ -71,7 +85,8 @@ spec:
         {{- if $resource.PreDeleteScriptPath }}
           {{ $resource.PreDeleteScriptPath }}
         {{- end }}
-          retry_kubectl "{{ $resource.Namespace }}" "delete" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --wait=false --ignore-not-found
+          resolved_namespace=$(resolve_delete_namespace "{{ $resource.Namespace }}" "{{ $resource.KindGroup }}/{{ $resource.Name }}")
+          retry_kubectl "$resolved_namespace" "delete" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --wait=false --ignore-not-found
         {{- if $resource.PostDeleteScriptPath }}
           {{ $resource.PostDeleteScriptPath }}
         {{- end }}
