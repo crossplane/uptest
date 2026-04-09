@@ -109,17 +109,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -134,7 +159,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -191,15 +216,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -214,7 +268,7 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -224,28 +278,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -257,10 +361,50 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -298,16 +442,45 @@ spec:
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -322,13 +495,54 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "" "wait" "s3.aws.upbound.io/example-bucket" --for=delete --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
@@ -380,17 +594,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -405,7 +644,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -462,15 +701,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -485,7 +753,7 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -495,28 +763,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -528,10 +846,50 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -569,16 +927,45 @@ spec:
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -593,13 +980,54 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "" "wait" "s3.aws.upbound.io/example-bucket" --for=delete --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
@@ -678,17 +1106,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -703,8 +1156,8 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
-          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
+          retry_annotate "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -777,15 +1230,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -800,8 +1282,8 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
-          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
+          retry_kubectl "upbound-system" "annotate" "cluster.gcp.platformref.upbound.io/test-cluster-claim" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -811,28 +1293,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -844,11 +1376,51 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
-          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
+          retry_kubectl "upbound-system" "annotate" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -886,16 +1458,45 @@ spec:
     description: Delete resources. If needs ordered deletion, the pre-delete scripts were used.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -910,19 +1511,87 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} delete s3.aws.upbound.io/example-bucket --wait=false --ignore-not-found"
+
+          resolve_delete_namespace() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ] || [ -z "$CHAINSAW_NAMESPACE" ]; then
+              printf '%s' "$namespace"
+              return 0
+            fi
+
+            if ${KUBECTL} get --namespace "$CHAINSAW_NAMESPACE" "$resource" >/dev/null 2>&1; then
+              printf '%s' "$CHAINSAW_NAMESPACE"
+            fi
+          }
+          resolved_namespace=$(resolve_delete_namespace "" "s3.aws.upbound.io/example-bucket")
+          retry_kubectl "$resolved_namespace" "delete" "s3.aws.upbound.io/example-bucket" --wait=false --ignore-not-found
           /tmp/bucket/post-delete.sh
           /tmp/claim/pre-delete.sh
-          retry_kubectl "${KUBECTL} delete cluster.gcp.platformref.upbound.io/test-cluster-claim --wait=false --namespace upbound-system --ignore-not-found"
+          resolved_namespace=$(resolve_delete_namespace "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim")
+          retry_kubectl "$resolved_namespace" "delete" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --wait=false --ignore-not-found
   - name: Assert Deletion
     description: Assert deletion of resources.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          ${KUBECTL} wait --for=delete s3.aws.upbound.io/example-bucket --timeout 10m0s
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "" "wait" "s3.aws.upbound.io/example-bucket" --for=delete --timeout 10m0s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          ${KUBECTL} wait --namespace upbound-system --for=delete cluster.gcp.platformref.upbound.io/test-cluster-claim --timeout 10m0s
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "upbound-system" "wait" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --for=delete --timeout 10m0s
     - script:
         content: |
           ${KUBECTL} wait managed --all --for=delete --timeout -1s
@@ -1009,17 +1678,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1034,7 +1728,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1091,15 +1785,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -1114,7 +1837,7 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -1124,28 +1847,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -1157,10 +1930,50 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -1261,17 +2074,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1286,8 +2124,8 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
-          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
+          retry_annotate "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1415,17 +2253,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1440,8 +2303,8 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
-          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
+          retry_annotate "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1514,15 +2377,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -1537,8 +2429,8 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
-          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
+          retry_kubectl "upbound-system" "annotate" "cluster.gcp.platformref.upbound.io/test-cluster-claim" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -1548,28 +2440,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
-          /tmp/check_endpoints.sh
-          sleep 10
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -1581,11 +2523,51 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
-          retry_kubectl "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+          sleep 10
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
+          retry_kubectl "upbound-system" "annotate" "cluster.gcp.platformref.upbound.io/test-cluster-claim" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then
@@ -1669,17 +2651,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1694,7 +2701,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
+          retry_annotate "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1785,17 +2792,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1810,8 +2842,8 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate --namespace upbound-system  cluster.gcp.platformref.upbound.io/test-cluster-claim upjet.upbound.io/test=true --overwrite"
-          retry_annotate "${KUBECTL} annotate  xnetwork.gcp.platformref.upbound.io/test-network-xr upjet.upbound.io/test=true --overwrite"
+          retry_annotate "upbound-system" "cluster.gcp.platformref.upbound.io/test-cluster-claim"
+          retry_annotate "" "xnetwork.gcp.platformref.upbound.io/test-network-xr"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -1921,17 +2953,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -1946,7 +3003,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -2010,17 +3067,42 @@ spec:
     - apply:
         file: /tmp/test-input.yaml
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
           echo "Running annotation script with retry logic"
+          annotate_resource() {
+            local namespace="$1"
+            local resource="$2"
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} annotate --namespace "$namespace" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            if ${KUBECTL} annotate "$resource" upjet.upbound.io/test=true --overwrite; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} annotate --namespace "$CHAINSAW_NAMESPACE" "$resource" upjet.upbound.io/test=true --overwrite
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_annotate() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Annotation attempt $attempt/$max_attempts for: $resource"
+              if annotate_resource "$namespace" "$resource"; then
                 echo "Annotation successful on attempt $attempt"
                 return 0
               else
@@ -2035,7 +3117,7 @@ spec:
             echo "Annotation failed after $max_attempts attempts"
             return 1
           }
-          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+          retry_annotate "" "s3.aws.upbound.io/example-bucket"
   - name: Assert Status Conditions
     description: |
       Assert applied resources. First, run the pre-assert script if exists.
@@ -2071,15 +3153,44 @@ spec:
       uptest-old-id annotation.
     try:
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -2094,7 +3205,7 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket crossplane.io/paused=true --overwrite"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" crossplane.io/paused=true --overwrite
           PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
           if [ -n "$PROVIDER_CONFIGS" ]; then
             echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 0}]'
@@ -2104,25 +3215,78 @@ spec:
     - sleep:
         duration: 10s
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
-          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
-          if [ -n "$PROVIDER_CONFIGS" ]; then
-            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
-          else
-            echo "No provider DeploymentRuntimeConfigs found to scale up"
-          fi
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch.sh -o /tmp/patch.sh && chmod +x /tmp/patch.sh
-          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/patch-ns.sh -o /tmp/patch-ns.sh && chmod +x /tmp/patch-ns.sh
-          /tmp/patch.sh s3.aws.upbound.io example-bucket
-          retry_kubectl() {
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          patch_resource_for_import() {
+            local namespace="$1"
+            local resource="$2"
+            local old_id
+
+            if ! run_resource_status_patch "$namespace" "$resource" --type=merge -p '{"status":{"conditions":[]}}'; then
+              return 1
+            fi
+
+            old_id=$(run_resource_kubectl "$namespace" get "$resource" -o=jsonpath='{.status.atProvider.id}') || return 1
+            run_resource_kubectl "$namespace" annotate "$resource" "uptest-old-id=$old_id" --overwrite
+          }
+
+          retry_patch_resource_for_import() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local resource="$2"
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: import $resource"
+              if patch_resource_for_import "$namespace" "$resource"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -2134,10 +3298,47 @@ spec:
                 ((attempt++))
               fi
             done
+
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket --all crossplane.io/paused=false --overwrite"
+
+          retry_kubectl() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              else
+                echo "Kubectl operation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+
+            echo "Kubectl operation failed after $max_attempts attempts"
+            return 1
+          }
+
+          PROVIDER_CONFIGS=$(${KUBECTL} get deploymentruntimeconfig --no-headers -o custom-columns=":metadata.name" | grep "provider-" || true)
+          if [ -n "$PROVIDER_CONFIGS" ]; then
+            echo "$PROVIDER_CONFIGS" | xargs ${KUBECTL} patch deploymentruntimeconfig --type='json' -p='[{"op": "replace", "path": "/spec/deploymentTemplate/spec/replicas", "value": 1}]'
+          else
+            echo "No provider DeploymentRuntimeConfigs found to scale up"
+          fi
+          retry_patch_resource_for_import "" "s3.aws.upbound.io/example-bucket"
+          retry_kubectl "" "annotate" "s3.aws.upbound.io/example-bucket" --all crossplane.io/paused=false --overwrite
   - name: Assert Status Conditions and IDs
     description: |
       Assert imported resources. Firstly check the status conditions. Then

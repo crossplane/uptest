@@ -20,16 +20,71 @@ spec:
     {{- end }}
     {{- if $resource.Root }}
     - script:
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
         content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_status_patch() {
+            local namespace="$1"
+            local resource="$2"
+            shift 2
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} --subresource=status patch "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} --subresource=status patch --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
           retry_kubectl() {
             local max_attempts=10
             local delay=5
             local attempt=1
-            local cmd="$1"
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $cmd"
-              if eval "$cmd"; then
+              echo "Kubectl attempt $attempt/$max_attempts for: $verb $resource"
+              if [ "$verb" = "status-patch" ] && run_resource_status_patch "$namespace" "$resource" "$@"; then
+                echo "Kubectl operation successful on attempt $attempt"
+                return 0
+              fi
+              if [ "$verb" != "status-patch" ] && run_resource_kubectl "$namespace" "$verb" "$resource" "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
               else
@@ -44,8 +99,8 @@ spec:
             echo "Kubectl operation failed after $max_attempts attempts"
             return 1
           }
-          retry_kubectl "${KUBECTL} --subresource=status patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{\"status\":{\"conditions\":[]}}'"
-          retry_kubectl "${KUBECTL} patch {{ $resource.KindGroup }}/{{ $resource.Name }} --type=merge -p '{\"spec\":{\"forProvider\":{{ $resource.UpdateParameter }}}}'"
+          retry_kubectl "{{ $resource.Namespace }}" "status-patch" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --type=merge -p '{"status":{"conditions":[]}}'
+          retry_kubectl "{{ $resource.Namespace }}" "patch" "{{ $resource.KindGroup }}/{{ $resource.Name }}" --type=merge -p '{"spec":{"forProvider":{{ $resource.UpdateParameter }}}}'
     {{- end }}
     {{- end }}
   - name: Assert Updated Resource
@@ -73,6 +128,33 @@ spec:
               status: "True"
             {{- end }}
     - script:
-        content: ${KUBECTL} get {{ if $resource.Namespace }}--namespace {{ $resource.Namespace }} {{ end }} {{ $resource.KindGroup }}/{{ $resource.Name }} -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"
+        env:
+        - name: CHAINSAW_NAMESPACE
+          value: ($namespace)
+        content: |
+          run_resource_kubectl() {
+            local namespace="$1"
+            local verb="$2"
+            local resource="$3"
+            shift 3
+
+            if [ -n "$namespace" ]; then
+              ${KUBECTL} "$verb" --namespace "$namespace" "$resource" "$@"
+              return $?
+            fi
+
+            if ${KUBECTL} "$verb" "$resource" "$@"; then
+              return 0
+            fi
+
+            if [ -n "$CHAINSAW_NAMESPACE" ]; then
+              ${KUBECTL} "$verb" --namespace "$CHAINSAW_NAMESPACE" "$resource" "$@"
+              return $?
+            fi
+
+            return 1
+          }
+
+          run_resource_kubectl "{{ $resource.Namespace }}" "get" "{{ $resource.KindGroup }}/{{ $resource.Name }}" -o=jsonpath='{.status.atProvider{{ $resource.UpdateAssertKey }}}' | grep -q "^{{ $resource.UpdateAssertValue }}$"
     {{- end }}
     {{- end }}
