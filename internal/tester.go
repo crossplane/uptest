@@ -161,17 +161,15 @@ func executeSingleTestFileLibraryMode(ctx context.Context, t *Tester, tf string,
 	runner := runner.New(clock, onFailure)
 
 	ticker := time.NewTicker(t.options.LogCollectionInterval)
-	done := make(chan bool)
 	var mutex sync.Mutex
 	defer func() {
 		ticker.Stop()
-		close(done)
 	}()
-
-	go logCollectorLibraryMode(done, ticker, &mutex, resources)
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	go logCollectorLibraryMode(ctx, ticker, &mutex, resources)
 
 	if err := runnerflags.SetupFlags(configuration.Spec); err != nil {
 		return err
@@ -209,14 +207,12 @@ func executeSingleTestFileCLIMode(ctx context.Context, t *Tester, tf string, tim
 
 	// Start ticker for kubectl command every 30 seconds
 	ticker := time.NewTicker(t.options.LogCollectionInterval)
-	done := make(chan bool)
 	defer func() {
 		ticker.Stop()
-		close(done)
 	}()
 
 	var mutex sync.Mutex
-	go logCollectorCLIMode(done, ticker, &mutex, resources)
+	go logCollectorCLIMode(ctx, ticker, &mutex, resources)
 
 	sc := bufio.NewScanner(stdout)
 	for sc.Scan() {
@@ -234,11 +230,11 @@ func executeSingleTestFileCLIMode(ctx context.Context, t *Tester, tf string, tim
 	return nil
 }
 
-func logCollectorLibraryMode(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+func logCollectorLibraryMode(ctx context.Context, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
 	logger := logging.NewNopLogger()
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			mutex.Lock()
@@ -268,10 +264,10 @@ func logCollectorLibraryMode(done chan bool, ticker *time.Ticker, mutex sync.Loc
 	}
 }
 
-func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+func logCollectorCLIMode(ctx context.Context, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			mutex.Lock()
@@ -285,7 +281,7 @@ func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker,
 				if r.Namespace != "" {
 					traceCmdArgs = fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -n %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name, r.Namespace)
 				}
-				traceCmd := exec.Command("bash", "-c", traceCmdArgs) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				traceCmd := exec.CommandContext(ctx, "bash", "-c", traceCmdArgs) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
 				output, err := traceCmd.CombinedOutput()
 				if err == nil {
 					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
