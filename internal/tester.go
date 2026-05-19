@@ -33,9 +33,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/crossplane/cli/v2/cmd/crossplane/trace"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
-	"github.com/crossplane/crossplane/v2/cmd/crank/beta/trace"
 
 	"github.com/crossplane/uptest/v2/internal/config"
 	"github.com/crossplane/uptest/v2/internal/templates"
