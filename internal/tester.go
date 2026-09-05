@@ -42,10 +42,10 @@ import (
 )
 
 var testFiles = []string{
-	"00-apply.yaml",
-	"01-update.yaml",
-	"02-import.yaml",
-	"03-delete.yaml",
+	templates.ApplyFilename,
+	templates.UpdateFilename,
+	templates.ImportFilename,
+	templates.DeleteFilename,
 }
 
 // NewTester returns a Tester object.
@@ -216,7 +216,7 @@ func executeSingleTestFileCLIMode(ctx context.Context, t *Tester, tf string, tim
 	}()
 
 	var mutex sync.Mutex
-	go logCollectorCLIMode(done, ticker, &mutex, resources)
+	go logCollectorCLIMode(ctx, done, ticker, &mutex, resources)
 
 	sc := bufio.NewScanner(stdout)
 	for sc.Scan() {
@@ -268,7 +268,7 @@ func logCollectorLibraryMode(done chan bool, ticker *time.Ticker, mutex sync.Loc
 	}
 }
 
-func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
+func logCollectorCLIMode(ctx context.Context, done chan bool, ticker *time.Ticker, mutex sync.Locker, resources []config.Resource) {
 	for {
 		select {
 		case <-done:
@@ -285,7 +285,7 @@ func logCollectorCLIMode(done chan bool, ticker *time.Ticker, mutex sync.Locker,
 				if r.Namespace != "" {
 					traceCmdArgs = fmt.Sprintf(`"${CROSSPLANE_CLI}" beta trace %s %s -n %s -o wide 2>>/tmp/uptest_crossplane_temp_errors.log`, r.KindGroup, r.Name, r.Namespace)
 				}
-				traceCmd := exec.Command("bash", "-c", traceCmdArgs) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
+				traceCmd := exec.CommandContext(ctx, "bash", "-c", traceCmdArgs) //nolint:gosec // Disabling gosec to allow dynamic shell command execution
 				output, err := traceCmd.CombinedOutput()
 				if err == nil {
 					log.Printf("crossplane trace logs %s\n%s\n", time.Now(), string(output))
@@ -301,6 +301,7 @@ func (t *Tester) prepareConfig() (*config.TestCase, []config.Resource, error) { 
 		Timeout:                  t.options.DefaultTimeout,
 		SetupScriptPath:          t.options.SetupScriptPath,
 		TeardownScriptPath:       t.options.TeardownScriptPath,
+		PostAssertScriptPath:     t.options.PostAssertScriptPath,
 		OnlyCleanUptestResources: t.options.OnlyCleanUptestResources,
 		TestDirectory:            "test-input.yaml",
 	}

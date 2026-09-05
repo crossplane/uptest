@@ -15,11 +15,21 @@ import (
 	"github.com/crossplane/uptest/v2/internal/config"
 )
 
+// File names of the rendered chainsaw test case steps, shared with callers
+// that need to know a step's file name without rendering it (e.g. to build
+// the ordered list of files a test case is expected to produce).
+const (
+	ApplyFilename  = "00-apply.yaml"
+	UpdateFilename = "01-update.yaml"
+	ImportFilename = "02-import.yaml"
+	DeleteFilename = "03-delete.yaml"
+)
+
 var fileTemplates = map[string]string{
-	"00-apply.yaml":  inputFileTemplate,
-	"01-update.yaml": updateFileTemplate,
-	"02-import.yaml": importFileTemplate,
-	"03-delete.yaml": deleteFileTemplate,
+	ApplyFilename:  inputFileTemplate,
+	UpdateFilename: updateFileTemplate,
+	ImportFilename: importFileTemplate,
+	DeleteFilename: deleteFileTemplate,
 }
 
 // Render renders the specified list of resources as a test case

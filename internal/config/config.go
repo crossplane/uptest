@@ -50,6 +50,12 @@ type AutomatedTest struct {
 
 	SetupScriptPath    string
 	TeardownScriptPath string
+	// PostAssertScriptPath is run once, after every resource in the test
+	// case has been asserted, and before the update, import and delete
+	// steps. It complements the per-resource post-assert hook, which is
+	// interleaved with the assertions and therefore cannot observe the
+	// test case as a whole.
+	PostAssertScriptPath string
 
 	DefaultTimeout    time.Duration
 	DefaultConditions []string
@@ -75,12 +81,13 @@ type Manifest struct {
 
 // TestCase represents a test-case to be run by chainsaw.
 type TestCase struct {
-	Timeout            time.Duration
-	SetupScriptPath    string
-	TeardownScriptPath string
-	SkipUpdate         bool
-	SkipImport         bool
-	SkipWebhookCheck   bool
+	Timeout              time.Duration
+	SetupScriptPath      string
+	TeardownScriptPath   string
+	PostAssertScriptPath string
+	SkipUpdate           bool
+	SkipImport           bool
+	SkipWebhookCheck     bool
 
 	OnlyCleanUptestResources bool
 

@@ -33,6 +33,12 @@ var (
 	setupScript    = e2e.Flag("setup-script", "Script that will be executed before running tests.").Default("").String()
 	teardownScript = e2e.Flag("teardown-script", "Script that will be executed after running tests.").Default("").String()
 
+	postAssertScript = e2e.Flag("post-assert-script", "Script that will be executed once after ALL resources have been asserted, "+
+		"before the update, import and delete steps.\n"+
+		"The per-resource \"uptest.upbound.io/post-assert-hook\" annotation runs once per resource, interleaved with the "+
+		"assertions. This runs a single time for the whole test case, so a check that must observe every resource in the "+
+		"same steady state has somewhere to live.").Default("").String()
+
 	defaultTimeout = e2e.Flag("default-timeout", "Default timeout in seconds for the test.\n"+
 		"Timeout could be overridden per resource using \"uptest.upbound.io/timeout\" annotation.").Default("1200s").Duration()
 	defaultConditions = e2e.Flag("default-conditions", "Comma separated list of default conditions to wait for a successful test.\n"+
@@ -75,21 +81,9 @@ func e2eTests() {
 		kingpin.Fatalf("No manifest to test provided.")
 	}
 
-	setupPath := ""
-	if *setupScript != "" {
-		setupPath, err = filepath.Abs(*setupScript)
-		if err != nil {
-			kingpin.FatalIfError(err, "cannot get absolute path of setup script")
-		}
-	}
-
-	teardownPath := ""
-	if *teardownScript != "" {
-		teardownPath, err = filepath.Abs(*teardownScript)
-		if err != nil {
-			kingpin.FatalIfError(err, "cannot get absolute path of teardown script")
-		}
-	}
+	setupPath := absScriptPath(*setupScript, "setup script")
+	teardownPath := absScriptPath(*teardownScript, "teardown script")
+	postAssertPath := absScriptPath(*postAssertScript, "post-assert script")
 
 	builder := pkg.NewAutomatedTestBuilder()
 	automatedTest := builder.
@@ -97,6 +91,7 @@ func e2eTests() {
 		SetDataSourcePath(*dataSourcePath).
 		SetSetupScriptPath(setupPath).
 		SetTeardownScriptPath(teardownPath).
+		SetPostAssertScriptPath(postAssertPath).
 		SetDefaultConditions(strings.Split(*defaultConditions, ",")).
 		SetDefaultTimeout(*defaultTimeout).
 		SetDirectory(*testDir).
@@ -112,4 +107,19 @@ func e2eTests() {
 
 	ctx := context.Background()
 	kingpin.FatalIfError(pkg.RunTestContext(ctx, automatedTest), "cannot run e2e tests successfully")
+}
+
+// absScriptPath resolves a script flag to an absolute path, mapping an unset
+// flag to the empty string, which every template reads as "no script".
+//
+// The three script flags all need this and none of them may proceed on a
+// resolution failure, so doing it inline once per flag put e2eTests over the
+// cyclomatic-complexity limit for no gain in clarity.
+func absScriptPath(script, description string) string {
+	if script == "" {
+		return ""
+	}
+	path, err := filepath.Abs(script)
+	kingpin.FatalIfError(err, "cannot get absolute path of %s", description)
+	return path
 }

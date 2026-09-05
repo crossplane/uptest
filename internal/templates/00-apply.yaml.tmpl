@@ -96,3 +96,15 @@ spec:
         entrypoint: {{ $resource.PostAssertScriptPath }}
     {{- end }}
     {{- end }}
+{{- if .TestCase.PostAssertScriptPath }}
+  - name: Post Assert
+    description: |
+      Run the test case's post-assert script, once, after every resource has
+      been asserted. The per-resource post-assert hook is interleaved with the
+      assertions and therefore only ever sees one resource at a time; this step
+      is the only place a check that must observe every resource in the same
+      steady state can run.
+    try:
+    - command:
+        entrypoint: {{ .TestCase.PostAssertScriptPath }}
+{{- end }}

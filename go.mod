@@ -4,13 +4,14 @@
 
 module github.com/crossplane/uptest/v2
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/alecthomas/kong v1.4.0
 	github.com/crossplane/crossplane-runtime/v2 v2.0.0
 	github.com/crossplane/crossplane/v2 v2.0.2
 	github.com/google/go-cmp v0.7.0
+	github.com/kaessert/crossplane-update-tester/sidecar v0.1.0
 	github.com/kyverno/chainsaw v0.2.13-0.20250116043056-57a42010852a
 	github.com/kyverno/pkg/ext v0.0.0-20240418121121-df8add26c55c
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6

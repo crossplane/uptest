@@ -51,6 +51,13 @@ func (b *Builder) SetTeardownScriptPath(teardownScriptPath string) *Builder {
 	return b
 }
 
+// SetPostAssertScriptPath sets the path of the script run once after every
+// resource has been asserted, and returns the Builder.
+func (b *Builder) SetPostAssertScriptPath(postAssertScriptPath string) *Builder {
+	b.test.PostAssertScriptPath = postAssertScriptPath
+	return b
+}
+
 // SetDefaultTimeout sets the default timeout duration for the AutomatedTest and returns the Builder.
 func (b *Builder) SetDefaultTimeout(defaultTimeout time.Duration) *Builder {
 	b.test.DefaultTimeout = defaultTimeout

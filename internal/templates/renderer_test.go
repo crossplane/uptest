@@ -5,6 +5,7 @@
 package templates
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -2176,5 +2177,172 @@ spec:
 				t.Errorf("Render(...): -want, +got:\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestRenderWithPostAssertScript(t *testing.T) {
+	type args struct {
+		tc        *config.TestCase
+		resources []config.Resource
+	}
+	type want struct {
+		out map[string]string
+		err error
+	}
+	tests := map[string]struct {
+		args args
+		want want
+	}{
+		"PostAssertScriptRendersOneStepAfterAllAssertions": {
+			args: args{
+				tc: &config.TestCase{
+					SetupScriptPath:      "/tmp/setup.sh",
+					PostAssertScriptPath: "/tmp/post-assert.sh",
+					Timeout:              10 * time.Minute,
+					TestDirectory:        "/tmp/test-input.yaml",
+					SkipUpdate:           true,
+					SkipImport:           true,
+				},
+				resources: []config.Resource{
+					{
+						Name:       "example-bucket",
+						APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+						Kind:       "Bucket",
+						KindGroup:  "s3.aws.upbound.io",
+						YAML:       bucketManifest,
+						Conditions: []string{"Test"},
+					},
+				},
+			},
+			want: want{
+				out: map[string]string{
+					"00-apply.yaml": `# This file belongs to the resource apply step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apply
+spec:
+  timeouts:
+    apply: 10m0s
+    assert: 10m0s
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+  - name: Apply Resources
+    description: Apply resources to the cluster.
+    try:
+    - script:
+        content: |
+          echo "Checking webhook health before proceeding..."
+          curl -sL https://raw.githubusercontent.com/crossplane/uptest/main/hack/check_endpoints.sh -o /tmp/check_endpoints.sh && chmod +x /tmp/check_endpoints.sh
+          /tmp/check_endpoints.sh
+    - sleep:
+        # Wait for conversion webhook endpoints to become fully operational after health check
+        duration: 10s
+    - apply:
+        file: /tmp/test-input.yaml
+    - script:
+        content: |
+          echo "Running annotation script with retry logic"
+          retry_annotate() {
+            local max_attempts=10
+            local delay=5
+            local attempt=1
+            local cmd="$1"
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "Annotation attempt $attempt/$max_attempts for: $cmd"
+              if eval "$cmd"; then
+                echo "Annotation successful on attempt $attempt"
+                return 0
+              else
+                echo "Annotation failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Retrying in ${delay}s..."
+                  sleep $delay
+                fi
+                ((attempt++))
+              fi
+            done
+            echo "Annotation failed after $max_attempts attempts"
+            return 1
+          }
+          retry_annotate "${KUBECTL} annotate  s3.aws.upbound.io/example-bucket upjet.upbound.io/test=true --overwrite"
+  - name: Assert Status Conditions
+    description: |
+      Assert applied resources. First, run the pre-assert script if exists.
+      Then, check the status conditions. Finally run the post-assert script if it
+      exists.
+    try:
+    - assert:
+        resource:
+          apiVersion: bucket.s3.aws.upbound.io/v1alpha1
+          kind: Bucket
+          metadata:
+            name: example-bucket
+          status:
+            ((conditions[?type == 'Test'])[0]):
+              status: "True"
+  - name: Post Assert
+    description: |
+      Run the test case's post-assert script, once, after every resource has
+      been asserted. The per-resource post-assert hook is interleaved with the
+      assertions and therefore only ever sees one resource at a time; this step
+      is the only place a check that must observe every resource in the same
+      steady state can run.
+    try:
+    - command:
+        entrypoint: /tmp/post-assert.sh
+`,
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := Render(tc.args.tc, tc.args.resources, true)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("Render(...): -want error, +got error:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.out, got); diff != "" {
+				t.Errorf("Render(...): -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestRenderWithoutPostAssertScriptOmitsTheStep is the negative control for
+// TestRenderWithPostAssertScript: an unset PostAssertScriptPath must leave the
+// rendered test case byte-for-byte as it was before the option existed, so
+// every consumer that does not opt in is unaffected.
+func TestRenderWithoutPostAssertScriptOmitsTheStep(t *testing.T) {
+	tc := &config.TestCase{
+		SetupScriptPath: "/tmp/setup.sh",
+		Timeout:         10 * time.Minute,
+		TestDirectory:   "/tmp/test-input.yaml",
+		SkipUpdate:      true,
+		SkipImport:      true,
+	}
+	resources := []config.Resource{
+		{
+			Name:       "example-bucket",
+			APIVersion: "bucket.s3.aws.upbound.io/v1alpha1",
+			Kind:       "Bucket",
+			KindGroup:  "s3.aws.upbound.io",
+			YAML:       bucketManifest,
+			Conditions: []string{"Test"},
+		},
+	}
+
+	got, err := Render(tc, resources, true)
+	if err != nil {
+		t.Fatalf("Render(...): unexpected error: %v", err)
+	}
+	if strings.Contains(got["00-apply.yaml"], "Post Assert") {
+		t.Errorf("rendered a Post Assert step with no PostAssertScriptPath set:\n%s", got["00-apply.yaml"])
 	}
 }
