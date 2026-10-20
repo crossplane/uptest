@@ -128,7 +128,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -208,7 +208,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -254,7 +254,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -316,7 +316,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -399,7 +399,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -479,7 +479,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -525,7 +525,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -587,7 +587,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -697,7 +697,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -794,7 +794,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -841,7 +841,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -904,7 +904,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -1028,7 +1028,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -1108,7 +1108,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -1154,7 +1154,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -1280,7 +1280,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -1434,7 +1434,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -1531,7 +1531,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -1578,7 +1578,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -1688,7 +1688,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -1804,7 +1804,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -1940,7 +1940,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -2029,7 +2029,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Annotation failed after $max_attempts attempts"
@@ -2088,7 +2088,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
@@ -2131,7 +2131,7 @@ spec:
                   echo "Retrying in ${delay}s..."
                   sleep $delay
                 fi
-                ((attempt++))
+                attempt=$((attempt+1))
               fi
             done
             echo "Kubectl operation failed after $max_attempts attempts"
