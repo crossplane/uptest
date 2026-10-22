@@ -54,7 +54,7 @@ func TestUpdateScriptPreservesParameter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("sh", "-c", script) //nolint:gosec // Script is rendered from a template under test.
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", script) //nolint:gosec // Script is rendered from a template under test.
 	cmd.Env = append(os.Environ(), "KUBECTL="+stub)
 	got, err := cmd.CombinedOutput()
 	if err != nil {
