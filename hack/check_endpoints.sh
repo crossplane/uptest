@@ -21,7 +21,7 @@ while [[ $attempt -le $max_attempts ]]; do
 	else
 		printf "Retrying... (%d/%d)\n" "$attempt" "$max_attempts" >&2
 	fi
-	((attempt++))
+	attempt=$((attempt+1))
 	sleep 5
 done
 exit 1

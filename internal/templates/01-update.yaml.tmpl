@@ -27,7 +27,7 @@ spec:
             local attempt=1
 
             while [ $attempt -le $max_attempts ]; do
-              echo "Kubectl attempt $attempt/$max_attempts for: $*"
+              printf 'Kubectl attempt %s/%s for: %s\n' "$attempt" "$max_attempts" "$*"
               if "$@"; then
                 echo "Kubectl operation successful on attempt $attempt"
                 return 0
