@@ -25,7 +25,7 @@ while [[ $attempt -le $max_attempts ]]; do
     else
         printf "Retrying... (%d/%d) for %s/%s/%s\n" "$attempt" "$max_attempts" "$kindgroup" "$name" "$namespace" >&2;
     fi;
-    ((attempt++));
+    attempt=$((attempt+1));
     sleep 5;
 done;
 if [[ $attempt -gt $max_attempts ]]; then
