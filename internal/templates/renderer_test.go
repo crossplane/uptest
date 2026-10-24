@@ -79,6 +79,21 @@ func TestRender(t *testing.T) {
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -90,11 +105,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -648,6 +658,21 @@ spec:
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -659,11 +684,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -979,6 +999,21 @@ func TestRenderWithSkipDelete(t *testing.T) {
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -990,11 +1025,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -1231,6 +1261,21 @@ spec:
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -1242,11 +1287,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -1385,6 +1425,21 @@ spec:
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -1396,11 +1451,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -1639,6 +1689,21 @@ spec:
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -1650,11 +1715,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
@@ -1755,6 +1815,21 @@ spec:
 			},
 			want: want{
 				out: map[string]string{
+					"0-setup.yaml": `# This file belongs to the resource setup step.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: setup
+spec:
+  timeouts:
+    exec: 10m0s
+  steps:
+  - name: Run Setup Script
+    description: Setup the test environment by running the setup script.
+    try:
+    - command:
+        entrypoint: /tmp/setup.sh
+`,
 					"00-apply.yaml": `# This file belongs to the resource apply step.
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
@@ -1766,11 +1841,6 @@ spec:
     assert: 10m0s
     exec: 10m0s
   steps:
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: /tmp/setup.sh
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
