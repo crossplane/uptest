@@ -13,6 +13,6 @@ spec:
     - time: 10s
       conditionType: "Synced" 
       conditionStatus: "True"
-  writeConnectionSecretsToRef:
+  writeConnectionSecretToRef:
     name: test-timeout-resource-conn
     namespace: crossplane-system

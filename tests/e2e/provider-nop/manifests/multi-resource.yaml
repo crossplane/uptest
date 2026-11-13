@@ -13,7 +13,7 @@ spec:
     - time: 10s
       conditionType: "Synced" 
       conditionStatus: "True"
-  writeConnectionSecretsToRef:
+  writeConnectionSecretToRef:
     name: test-multi-resource-1-conn
     namespace: crossplane-system
 ---
@@ -32,6 +32,6 @@ spec:
     - time: 15s
       conditionType: "Synced" 
       conditionStatus: "True"
-  writeConnectionSecretsToRef:
+  writeConnectionSecretToRef:
     name: test-multi-resource-2-conn
     namespace: crossplane-system

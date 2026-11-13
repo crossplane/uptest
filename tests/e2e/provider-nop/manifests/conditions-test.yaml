@@ -17,6 +17,6 @@ spec:
     - time: 30s
       conditionType: "UpToDate"
       conditionStatus: "True"
-  writeConnectionSecretsToRef:
+  writeConnectionSecretToRef:
     name: test-conditions-resource-conn
     namespace: crossplane-system
