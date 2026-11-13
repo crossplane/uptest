@@ -67,6 +67,16 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "crossplane/crossplane",
       "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      // We want a PR to bump provider package versions used in the e2e test
+      // setup scripts, annotated with a renovate comment above the variable.
+      "customType": "regex",
+      "description": "Bump provider package versions in e2e test setup scripts",
+      "managerFilePatterns": ["/^tests\\/e2e\\/[^/]+\\/setup\\.sh$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z_]+_VERSION=\"\\$\\{[A-Z_]+_VERSION:-(?<currentValue>[^}]+)\\}\"\\n"
+      ]
     }
   ],
   // PackageRules disabled below should be enabled in case of vulnerabilities

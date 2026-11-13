@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# renovate: datasource=github-releases depName=crossplane-contrib/provider-nop
+PROVIDER_NOP_VERSION="${PROVIDER_NOP_VERSION:-v0.5.0}"
+
 echo "Setting up provider-nop for uptest e2e tests..."
 
 # Install Crossplane if not already installed
@@ -27,7 +30,7 @@ kind: Provider
 metadata:
   name: provider-nop
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-nop:v0.5.0
+  package: xpkg.upbound.io/crossplane-contrib/provider-nop:${PROVIDER_NOP_VERSION}
 EOF
 
 # Wait for provider to be healthy
