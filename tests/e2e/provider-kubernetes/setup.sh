@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# renovate: datasource=github-releases depName=crossplane-contrib/provider-kubernetes
+PROVIDER_KUBERNETES_VERSION="${PROVIDER_KUBERNETES_VERSION:-v1.0.0}"
+
 echo "Setting up provider-kubernetes for uptest e2e tests..."
 
 # Install Crossplane if not already installed
@@ -27,7 +30,7 @@ kind: Provider
 metadata:
   name: provider-kubernetes
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.0.0
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:${PROVIDER_KUBERNETES_VERSION}
 EOF
 
 # Wait for provider to be healthy
