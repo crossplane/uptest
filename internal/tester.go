@@ -42,6 +42,7 @@ import (
 )
 
 var testFiles = []string{
+	"0-setup.yaml",
 	"00-apply.yaml",
 	"01-update.yaml",
 	"02-import.yaml",

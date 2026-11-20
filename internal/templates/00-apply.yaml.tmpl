@@ -9,13 +9,6 @@ spec:
     assert: {{ .TestCase.Timeout }}
     exec: {{ .TestCase.Timeout }}
   steps:
-  {{- if .TestCase.SetupScriptPath }}
-  - name: Run Setup Script
-    description: Setup the test environment by running the setup script.
-    try:
-    - command:
-        entrypoint: {{ .TestCase.SetupScriptPath }}
-  {{- end }}
   - name: Apply Resources
     description: Apply resources to the cluster.
     try:
